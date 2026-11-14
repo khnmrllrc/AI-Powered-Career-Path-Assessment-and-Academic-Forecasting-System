@@ -50,7 +50,7 @@ A comprehensive Django-based application for assessing student skills and aptitu
 
 ## Technology Stack
 
-- **Backend**: Django 3.0.7 (Python 3.11)
+- **Backend**: Django 5.2.13 (Python 3.11+)
 - **Database**: SQLite3
 - **Frontend**: Bootstrap 5.3.3, Font Awesome 6.4.0
 - **Additional Libraries**: qrcode[pil], Pillow
