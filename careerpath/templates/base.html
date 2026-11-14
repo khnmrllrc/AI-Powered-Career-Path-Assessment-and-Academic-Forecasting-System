@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Career Path System{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% url 'aclc_logo' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-bg: #153153;
+            --sidebar-accent: #1f4f86;
+            --sidebar-text: #e8eff8;
+            --page-bg: #edf2f7;
+            --panel-bg: #ffffff;
+            --line: #d8e0eb;
+            --brand-red: #c92a2a;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(180deg, #f5f7fb 0%, #eaf0f6 100%);
+            color: #1c2a39;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .app-shell {
+            min-height: 100vh;
+            width: 100%;
+            overflow-x: clip;
+        }
+
+        .sidebar-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 22, 38, 0.45);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+            z-index: 1030;
+        }
+
+        .app-sidebar {
+            width: 290px;
+            max-width: 100vw;
+            background: linear-gradient(180deg, var(--sidebar-bg) 0%, #102846 100%);
+            color: var(--sidebar-text);
+            position: fixed;
+            inset: 0 auto 0 0;
+            z-index: 1040;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 30px rgba(10, 29, 53, 0.18);
+            transition: transform 0.25s ease;
+            overflow-x: hidden;
+        }
+
+        .sidebar-header {
+            padding: 1.1rem 1.1rem 0.8rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .brand-logo {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: #fff;
+            padding: 0.2rem;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+            display: block;
+        }
+
+        .brand-logo-shell {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            flex: 0 0 60px;
+            position: relative;
+        }
+
+        .brand-logo-fallback {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #17314f;
+            letter-spacing: 0.08em;
+            background: radial-gradient(circle at center, #ffffff 0%, #eef3f8 100%);
+            z-index: 0;
+        }
+
+        .brand-logo-shell img {
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-copy small {
+            display: block;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 0.68rem;
+            color: rgba(232, 239, 248, 0.7);
+            margin-bottom: 0.2rem;
+        }
+
+        .brand-copy strong {
+            display: block;
+            font-size: 1.05rem;
+            line-height: 1.3;
+            color: #fff;
+        }
+
+        .brand-copy span {
+            display: block;
+            font-size: 0.82rem;
+            color: rgba(232, 239, 248, 0.8);
+            margin-top: 0.15rem;
+        }
+
+        .sidebar-section-title {
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(232, 239, 248, 0.58);
+            padding: 1.25rem 1.25rem 0.65rem;
+        }
+
+        .sidebar-nav {
+            padding: 0 0.75rem;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar-nav .nav-link {
+            color: var(--sidebar-text);
+            border-radius: 11px;
+            padding: 0.58rem 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            margin-bottom: 0.2rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .sidebar-nav .nav-link i {
+            width: 1.15rem;
+            text-align: center;
+        }
+
+
+        .sidebar-nav .nav-link:hover,
+        .sidebar-nav .nav-link.active {
+            background: linear-gradient(90deg, rgba(201, 42, 42, 0.95), rgba(150, 20, 20, 0.92));
+            color: #fff;
+            transform: translateX(2px);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 1rem 1.25rem 1.4rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            flex: 0 0 auto;
+        }
+
+        .user-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 13px;
+            padding: 0.7rem 0.8rem;
+        }
+
+        .user-card strong,
+        .user-card span {
+            display: block;
+        }
+
+        .user-card strong {
+            color: #fff;
+            font-size: 0.82rem;
+            overflow-wrap: anywhere;
+        }
+
+        .user-card span {
+            color: rgba(232, 239, 248, 0.72);
+            font-size: 0.7rem;
+            margin-top: 0.15rem;
+        }
+
+        .logout-form {
+            margin-top: 0.5rem;
+        }
+
+        .logout-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: none;
+            border: 0;
+            padding: 0;
+        }
+
+        .logout-link:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        .app-main {
+            margin-left: 290px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .mobile-topbar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1rem 0;
+        }
+
+        .mobile-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #17314f;
+            text-decoration: none;
+        }
+
+        .mobile-brand img {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: #fff;
+            padding: 0.15rem;
+            box-shadow: 0 6px 14px rgba(16, 40, 70, 0.12);
+        }
+
+        .mobile-brand strong {
+            display: block;
+            font-size: 0.92rem;
+            line-height: 1.2;
+        }
+
+        .mobile-brand span {
+            display: block;
+            font-size: 0.74rem;
+            color: #5b6c7d;
+        }
+
+        .menu-toggle {
+            border: 0;
+            background: #fff;
+            color: #17314f;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            box-shadow: 0 10px 18px rgba(17, 42, 68, 0.12);
+        }
+
+        .page-content {
+            flex: 1;
+            padding: 1.5rem;
+        }
+
+        .content-panel {
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(216, 224, 235, 0.9);
+            border-radius: 28px;
+            box-shadow: 0 18px 45px rgba(24, 46, 78, 0.08);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+        }
+
+        .form-container {
+            max-width: 500px;
+            margin: 60px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 18px 40px rgba(31, 58, 95, 0.15);
+        }
+
+        .form-control,
+        .form-select {
+            border-radius: 10px;
+            border: 1px solid #d3dce6;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #2f69a8;
+            box-shadow: 0 0 0 0.2rem rgba(47, 105, 168, 0.15);
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: #24364a;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary {
+            background-color: #225fa1;
+            border-color: #225fa1;
+        }
+
+        .btn-primary:hover {
+            background-color: #19497c;
+            border-color: #19497c;
+        }
+
+        .alert {
+            margin-bottom: 20px;
+            border-radius: 14px;
+        }
+
+        .errorlist {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 5px;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        footer {
+            padding: 0 1.5rem 1.5rem;
+        }
+
+        .footer-inner {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 1rem 1.25rem;
+            color: #5a6b7c;
+            font-size: 0.92rem;
+        }
+
+        @media (max-width: 991.98px) {
+            .app-sidebar {
+                transform: translateX(-100%);
+            }
+
+            .app-sidebar.open {
+                transform: translateX(0);
+            }
+
+            .sidebar-backdrop.open {
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            .app-main {
+                margin-left: 0;
+            }
+
+            .mobile-topbar {
+                display: flex;
+            }
+
+            .page-content {
+                padding: 1rem;
+            }
+
+            .content-panel {
+                border-radius: 22px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-header">
+                <a class="brand-mark" href="{% url 'home' %}">
+                    <span class="brand-logo-shell">
+                        <span class="brand-logo-fallback">ACLC</span>
+                        <img src="{% url 'aclc_logo' %}" alt="ACLC College of Tacloban City logo" class="brand-logo">
+                    </span>
+                    <div class="brand-copy">
+                        <small>CareerPath AI</small>
+                        <strong>ACLC College</strong>
+                        <span>Tacloban City</span>
+                    </div>
+                </a>
+            </div>
+
+            <nav class="sidebar-nav nav flex-column">
+                <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
+                    <i class="fas fa-house"></i>
+                    <span>Home</span>
+                </a>
+
+                {% if user.is_authenticated %}
+                    {% if user.is_staff %}
+                        <a class="nav-link {% if request.resolver_match.url_name == 'counselor_dashboard' %}active{% endif %}" href="{% url 'counselor_dashboard' %}">
+                            <i class="fas fa-chart-pie"></i>
+                            <span>Counselor Dashboard</span>
+                        </a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'students_list' or request.resolver_match.url_name == 'student_report' %}active{% endif %}" href="{% url 'students_list' %}">
+                            <i class="fas fa-user-graduate"></i>
+                            <span>Student Records</span>
+                        </a>
+                        <a class="nav-link {% if request.path|slice:':28' == '/counselor/assessment-tests' %}active{% endif %}" href="/counselor/assessment-tests/">
+                            <i class="fas fa-folder-open"></i>
+                            <span>Assessment Library</span>
+                        </a>
+                    {% else %}
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                            <i class="fas fa-gauge-high"></i>
+                            <span>Dashboard</span>
+                        </a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'start_assessment' or request.resolver_match.url_name == 'assessment_results' %}active{% endif %}" href="{% url 'start_assessment' %}">
+                            <i class="fas fa-file-signature"></i>
+                            <span>Assessment</span>
+                        </a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'view_career_recommendations' %}active{% endif %}" href="{% url 'view_career_recommendations' %}">
+                            <i class="fas fa-route"></i>
+                            <span>Career Paths</span>
+                        </a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'academic_forecast' or request.resolver_match.url_name == 'view_academic_forecast' %}active{% endif %}" href="{% url 'academic_forecast' %}">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Academic Forecast</span>
+                        </a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'job_market_matching' or request.resolver_match.url_name == 'view_in_demand_careers' %}active{% endif %}" href="{% url 'job_market_matching' %}">
+                            <i class="fas fa-briefcase"></i>
+                            <span>Job Market</span>
+                        </a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'qr_profile' %}active{% endif %}" href="{% url 'qr_profile' %}">
+                            <i class="fas fa-qrcode"></i>
+                            <span>QR Profile</span>
+                        </a>
+                    {% endif %}
+                {% else %}
+                    <a class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" href="{% url 'login' %}">
+                        <i class="fas fa-right-to-bracket"></i>
+                        <span>Login</span>
+                    </a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}" href="{% url 'register' %}">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Register</span>
+                    </a>
+                {% endif %}
+            </nav>
+
+            {% if user.is_authenticated %}
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <strong>{{ user.get_full_name|default:user.username }}</strong>
+                    <span>{{ user.student_id|default:user.username }}</span>
+                    <form method="post" action="{% url 'logout' %}" class="logout-form">
+                        {% csrf_token %}
+                        <button type="submit" class="logout-link">
+                            <i class="fas fa-arrow-right-from-bracket"></i>
+                            <span>Logout</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </aside>
+
+        <main class="app-main">
+            <div class="mobile-topbar">
+                <a class="mobile-brand" href="{% url 'home' %}">
+                    <span class="brand-logo-shell" style="width:42px;height:42px;flex-basis:42px;">
+                        <span class="brand-logo-fallback" style="font-size:0.6rem;">ACLC</span>
+                        <img src="{% url 'aclc_logo' %}" alt="ACLC College logo" class="mobile-brand-logo">
+                    </span>
+                    <div>
+                        <strong>CareerPath AI</strong>
+                        <span>ACLC Tacloban City</span>
+                    </div>
+                </a>
+                <button class="menu-toggle" type="button" id="sidebarToggle" aria-label="Toggle navigation">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+
+            <div class="page-content">
+                <div class="content-panel">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% block content %}{% endblock %}
+                </div>
+            </div>
+
+            <footer>
+                <div class="footer-inner text-center">
+                    &copy; 2026 CareerPath AI - ACLC College of Tacloban City
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const sidebar = document.getElementById('appSidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarBackdrop.classList.remove('open');
+        }
+
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', function () {
+                sidebar.classList.toggle('open');
+                sidebarBackdrop.classList.toggle('open');
+            });
+        }
+
+        if (sidebarBackdrop) {
+            sidebarBackdrop.addEventListener('click', closeSidebar);
+        }
+
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 992) {
+                closeSidebar();
+            }
+        });
+    </script>
+</body>
+</html>

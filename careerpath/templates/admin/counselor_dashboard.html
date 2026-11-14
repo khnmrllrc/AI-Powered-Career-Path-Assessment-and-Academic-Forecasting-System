@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}Counselor Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1>Welcome, {{ user.first_name|default:"Counselor" }}!</h1>
+            <p class="text-muted mb-0">Your student monitoring dashboard</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <a href="{% url 'students_list' %}" class="btn btn-primary">
+                <i class="fas fa-users me-2"></i>View All Students
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <a href="{% url 'students_list' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-graduate fa-2x text-primary mb-3"></i>
+                    <h5 class="card-title">Student Records</h5>
+                    <p class="card-text"><small>Browse all registered students and reports</small></p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 mb-3">
+            <a href="{% url 'students_list' %}?status=completed" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                    <h5 class="card-title">Completed Assessments</h5>
+                    <p class="card-text"><small>Review students who already finished the assessment</small></p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 mb-3">
+            <a href="{% url 'students_list' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-flag fa-2x text-warning mb-3"></i>
+                    <h5 class="card-title">Follow-up Reports</h5>
+                    <p class="card-text"><small>Track students that may need counselor attention</small></p>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4 mb-3">
+            <a href="/counselor/assessment-tests/" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-folder-open fa-2x text-info mb-3"></i>
+                    <h5 class="card-title">Assessment Library</h5>
+                    <p class="card-text"><small>Upload files for assessment distribution by course category</small></p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-users"></i> Total Students
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-1">{{ total_students }}</h2>
+                    <p class="text-muted mb-0">Registered student accounts</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-clipboard-check"></i> Assessments Completed
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-1">{{ completed_assessments }}</h2>
+                    <p class="text-muted mb-0">Students with finished assessments</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-exclamation-triangle"></i> Flagged Reports
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-1">{{ flagged_reports }}</h2>
+                    <p class="text-muted mb-0">Reports marked for follow-up</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-chart-line"></i> Completion Rate
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-1">
+                        {% if total_students > 0 %}
+                            {% widthratio completed_assessments total_students 100 %}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </h2>
+                    <p class="text-muted mb-0">Assessment completion across students</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-md-12">
+            <h4 class="mb-3">Recent Student Reports</h4>
+        </div>
+        {% for report in recent_reports %}
+        <div class="col-md-6 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="card-title mb-1">{{ report.student.first_name }} {{ report.student.last_name }}</h5>
+                            <p class="text-muted small mb-0">Student ID: {{ report.student.student_id }}</p>
+                        </div>
+                        {% if report.is_flagged %}
+                            <span class="badge bg-danger">Flagged</span>
+                        {% else %}
+                            <span class="badge bg-success">Clear</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="mb-2">
+                        <strong>Assessment:</strong>
+                        {% if report.student.assessment %}
+                            <span class="badge {% if report.student.assessment.status == 'completed' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ report.student.assessment.get_status_display }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">Not Started</span>
+                        {% endif %}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Score:</strong>
+                        {% if report.student.assessment and report.student.assessment.total_score %}
+                            {{ report.student.assessment.total_score }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                    <p class="text-muted small mb-3">Last updated {{ report.updated_at|date:"M d, Y" }}</p>
+
+                    <a href="{% url 'student_report' report.student.id %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-eye me-1"></i>View Report
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-md-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <p class="text-muted mb-0">No student reports available yet.</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

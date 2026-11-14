@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Assessment Results{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-check-circle"></i> Assessment Complete!
+                </div>
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-4">Your Assessment Results</h5>
+                    
+                    {% if assessment %}
+                    <div class="row text-center mb-4">
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light p-3">
+                                <h6 class="text-muted">Total Score</h6>
+                                <h3 class="text-primary">{{ assessment.total_score|floatformat:0 }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light p-3">
+                                <h6 class="text-muted">Questions Answered</h6>
+                                <h3 class="text-info">{{ assessment.responses.count }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-light p-3">
+                                <h6 class="text-muted">Status</h6>
+                                <h3><span class="badge bg-success">Completed</span></h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if skill_profile and skill_profile.skills %}
+                    <h6 class="mt-4 mb-3">Your Top Skills</h6>
+                    <div class="mb-4">
+                        {% for skill, score in skill_profile.skills.items %}
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <label class="form-label mb-0">{{ skill }}</label>
+                                    <span class="badge bg-info">{{ score|floatformat:0 }}%</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar" role="progressbar" style="width: {{ score }}%"></div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if recommendation %}
+                    <h6 class="mt-4 mb-3">Initial Recommendations</h6>
+                    <div class="alert alert-info">
+                        <p>{{ recommendation.recommendation_text }}</p>
+                        <p class="mb-0">
+                            <strong>Compatibility Score:</strong> 
+                            <span class="badge bg-primary">{{ recommendation.compatibility_score|floatformat:1 }}%</span>
+                        </p>
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-4 d-flex gap-2">
+                        <a href="{% url 'view_career_recommendations' %}" class="btn btn-primary">
+                            <i class="fas fa-path"></i> View Career Recommendations
+                        </a>
+                        <a href="{% url 'academic_forecast' %}" class="btn btn-info">
+                            <i class="fas fa-chart-line"></i> Academic Forecast
+                        </a>
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                            Back to Dashboard
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        No assessment found. Please complete the assessment first.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

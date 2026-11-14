@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1>Welcome, {{ user.first_name }}!</h1>
+            <p class="text-muted">Your Personal Career Path Dashboard</p>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h4 class="mb-3">Quick Actions</h4>
+        </div>
+        {% if not assessment or assessment.status != 'completed' %}
+        <div class="col-md-3 mb-3">
+            <a href="{% url 'start_assessment' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-edit fa-2x text-primary mb-3"></i>
+                    <h5 class="card-title">Take Assessment</h5>
+                    <p class="card-text"><small>Start or resume your career assessment</small></p>
+                </div>
+            </a>
+        </div>
+        {% else %}
+        <div class="col-md-3 mb-3">
+            <a href="{% url 'assessment_results' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                    <h5 class="card-title">Assessment Results</h5>
+                    <p class="card-text"><small>View your assessment results</small></p>
+                </div>
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="col-md-3 mb-3">
+            <a href="{% url 'view_career_recommendations' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-path fa-2x text-info mb-3"></i>
+                    <h5 class="card-title">Career Paths</h5>
+                    <p class="card-text"><small>View recommended career paths</small></p>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <a href="{% url 'academic_forecast' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-2x text-warning mb-3"></i>
+                    <h5 class="card-title">Academic Forecast</h5>
+                    <p class="card-text"><small>Get success predictions</small></p>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <a href="{% url 'job_market_matching' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-briefcase fa-2x text-success mb-3"></i>
+                    <h5 class="card-title">Job Market</h5>
+                    <p class="card-text"><small>Top in-demand careers</small></p>
+                </div>
+            </a>
+        </div>
+
+        {% if not user.is_staff %}
+        <div class="col-md-3 mb-3">
+            <a href="{% url 'qr_profile' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
+                <div class="card-body text-center">
+                    <i class="fas fa-qrcode fa-2x text-danger mb-3"></i>
+                    <h5 class="card-title">QR Profile</h5>
+                    <p class="card-text"><small>View your QR profile</small></p>
+                </div>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Status Cards -->
+    <div class="row">
+        <!-- Assessment Status -->
+        <div class="col-md-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-edit"></i> Assessment Status
+                </div>
+                <div class="card-body">
+                    {% if assessment %}
+                        <p class="mb-2">
+                            <strong>Status:</strong> 
+                            <span class="badge {% if assessment.status == 'completed' %}bg-success{% else %}bg-warning{% endif %}">
+                                {{ assessment.get_status_display }}
+                            </span>
+                        </p>
+                        {% if assessment.total_score %}
+                        <p class="mb-0"><strong>Score:</strong> {{ assessment.total_score }}</p>
+                        {% endif %}
+                    {% else %}
+                    <p class="text-muted">Assessment not started yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations Status -->
+        <div class="col-md-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-lightbulb"></i> Recommendations
+                </div>
+                <div class="card-body">
+                    {% if recommendation %}
+                        <p class="mb-2"><strong>Compatibility:</strong> {{ recommendation.compatibility_score|floatformat:1 }}%</p>
+                        <p class="mb-0"><strong>Paths:</strong> {{ recommendation.career_paths.count }}</p>
+                    {% else %}
+                    <p class="text-muted">Complete the assessment to get recommendations.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Academic Forecast -->
+        <div class="col-md-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-chart-line"></i> Academic Forecast
+                </div>
+                <div class="card-body">
+                    {% if forecast %}
+                        <p class="mb-2"><strong>Career Path:</strong> {{ forecast.selected_career_path }}</p>
+                        <p class="mb-0"><strong>Success Rate:</strong> {{ forecast.predicted_success_rate|floatformat:1 }}%</p>
+                    {% else %}
+                    <p class="text-muted">Select a career path to generate forecast.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top In-Demand Careers -->
+    {% if top_careers %}
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <h4 class="mb-3">Top In-Demand Careers</h4>
+        </div>
+        {% for career in top_careers %}
+        <div class="col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">#{career.rank} - {{ career.title }}</h6>
+                    <p class="card-text small text-muted">{{ career.description|truncatewords:15 }}</p>
+                    <p class="mb-0">
+                        <small><strong>Job Growth:</strong> {{ career.job_growth }}</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

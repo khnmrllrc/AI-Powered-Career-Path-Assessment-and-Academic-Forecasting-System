@@ -1,0 +1,768 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
+from django.urls import reverse
+from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import JsonResponse, HttpResponse, FileResponse, Http404
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
+from django.db.models import Avg, Count, Q
+from datetime import datetime
+import json
+import socket
+import uuid
+from pathlib import Path
+from urllib.parse import urlsplit
+
+
+from django.db import IntegrityError
+from .forms import (
+    LoginForm,
+    RegisterForm,
+    AssessmentQuestionForm,
+    AssessmentLibraryFileForm,
+    CareerPathSelectionForm,
+    CounselorNotesForm,
+)
+from .models import (
+    StudentUser, StudentAssessment, AssessmentResponse, AssessmentQuestion,
+    CareerRecommendation, AcademicForecast, InDemandCareer, StudentSkillProfile,
+    StudentReport, CareerPath, AssessmentLibraryFile
+)
+
+LOGO_PATH = Path(__file__).resolve().parent / 'static' / 'career' / 'aclc-logo.png'
+
+
+def get_lan_ip_address():
+    """Return the IPv4 address used for outbound network traffic."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as network_socket:
+            network_socket.connect(('8.8.8.8', 80))
+            return network_socket.getsockname()[0]
+    except OSError:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return '127.0.0.1'
+
+
+def get_qr_results_url(request, student):
+    """Build a QR URL using the configured public address or LAN fallback."""
+    path = reverse('public_assessment_results', args=[student.qr_code])
+    if settings.QR_PUBLIC_BASE_URL:
+        return f"{settings.QR_PUBLIC_BASE_URL.rstrip('/')}{path}"
+
+    host = request.get_host()
+    parsed_host = urlsplit(f'//{host}')
+    hostname = parsed_host.hostname
+
+    if hostname in {'localhost', '127.0.0.1', '0.0.0.0', '::1'}:
+        hostname = get_lan_ip_address()
+        host = f'{hostname}:{parsed_host.port}' if parsed_host.port else hostname
+        return f'{request.scheme}://{host}{path}'
+
+    return request.build_absolute_uri(path)
+
+def home(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    return render(request, 'home.html')
+
+
+def aclc_logo(request):
+    """Serve the ACLC logo without depending on staticfiles configuration."""
+    if not LOGO_PATH.exists():
+        raise Http404('Logo file not found.')
+    return FileResponse(LOGO_PATH.open('rb'), content_type='image/png')
+
+from django.contrib.auth import logout as auth_logout
+
+@require_http_methods(["POST"])
+def logout_view(request):
+    auth_logout(request)
+    messages.success(request, 'Logged out successfully.')
+    return redirect('home')
+
+@never_cache
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    
+    if request.method == 'POST':
+        submitted_student_id = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+        user = StudentUser.objects.filter(
+            Q(student_id=submitted_student_id) |
+            Q(username=submitted_student_id) |
+            Q(email__iexact=submitted_student_id)
+        ).first()
+
+        auth_username = user.username if user and user.username else submitted_student_id
+        form = LoginForm(request, data={
+            'username': auth_username,
+            'password': password,
+        })
+
+        if form.is_valid():
+            authenticated_user = form.get_user()
+            login(request, authenticated_user)
+            messages.success(request, 'Login successful!')
+            return redirect('dashboard')
+
+        if user and user.check_password(password):
+            login(request, user)
+            messages.success(request, 'Login successful!')
+            return redirect('dashboard')
+
+        if user and user.password == password:
+            user.set_password(password)
+            if not user.username:
+                user.username = user.student_id or user.email
+            user.save(update_fields=['password', 'username'])
+            login(request, user)
+            messages.success(request, 'Login successful!')
+            return redirect('dashboard')
+
+        if not user:
+            form.add_error('username', 'No account found for that Student ID, username, or email.')
+        else:
+            form.add_error('password', 'Invalid student ID or password.')
+
+        if not form.errors:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = LoginForm()
+    return render(request, 'registration/login.html', {'form': form})
+
+@never_cache
+def register_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            try:
+                user = form.save()
+                # Create associated records
+                StudentSkillProfile.objects.create(student=user)
+                StudentReport.objects.create(student=user)
+                
+                messages.success(request, 'Registration successful! Please login.')
+                return redirect('login')
+            except IntegrityError:
+                messages.error(request, 'Registration failed. Student ID or email already exists. Please use different values.')
+                form.add_error(None, 'Database error: Student ID or email already taken.')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = RegisterForm()
+    return render(request, 'registration/register.html', {'form': form})
+
+
+@login_required(login_url='login')
+def dashboard(request):
+    """Main dashboard for student"""
+    student = request.user
+
+    if student.is_staff:
+        return redirect('counselor_dashboard')
+    
+    # Get assessment status
+    assessment = StudentAssessment.objects.filter(student=student).first()
+    
+    # Get recommendations
+    recommendation = CareerRecommendation.objects.filter(student=student).first()
+    
+    # Get forecast
+    forecast = AcademicForecast.objects.filter(student=student).first()
+    
+    # Get top in-demand careers
+    top_careers = InDemandCareer.objects.all()[:5]
+    
+    # Get skill profile
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    
+    context = {
+        'assessment': assessment,
+        'recommendation': recommendation,
+        'forecast': forecast,
+        'top_careers': top_careers,
+        'skill_profile': skill_profile,
+    }
+    return render(request, 'dashboard.html', context)
+
+
+@login_required(login_url='login')
+@never_cache
+def start_assessment(request):
+    """Start or resume assessment"""
+    student = request.user
+    
+    # Get or create assessment
+    assessment, created = StudentAssessment.objects.get_or_create(student=student)
+    
+    if assessment.status == 'completed':
+        messages.info(request, 'You have already completed the assessment.')
+        return redirect('assessment_results')
+    
+    # Get first unanswered question
+    answered_questions = AssessmentResponse.objects.filter(
+        assessment=assessment
+    ).values_list('question_id', flat=True)
+    
+    next_question = AssessmentQuestion.objects.filter(
+        is_active=True
+    ).exclude(
+        id__in=answered_questions
+    ).first()
+    
+    if not next_question:
+        # All questions answered - complete assessment
+        assessment.status = 'completed'
+        assessment.completed_at = datetime.now()
+        assessment.total_score = calculate_assessment_score(assessment)
+        assessment.save()
+        
+        # Generate recommendations
+        generate_career_recommendations(student, assessment)
+        
+        messages.success(request, 'Assessment completed!')
+        return redirect('assessment_results')
+    
+    if request.method == 'POST':
+        form = AssessmentQuestionForm(next_question, request.POST)
+        if form.is_valid():
+            selected_option = int(form.cleaned_data['answer'])
+            options = next_question.get_normalized_options()
+            selected_points = {}
+
+            if 0 <= selected_option < len(options):
+                selected_points = options[selected_option].get('points', {})
+            
+            # Save response
+            AssessmentResponse.objects.update_or_create(
+                assessment=assessment,
+                question=next_question,
+                defaults={
+                    'selected_option': selected_option,
+                    'points_earned': json.dumps(selected_points)
+                }
+            )
+            
+            messages.success(request, f'Question {next_question.order} saved!')
+            return redirect('start_assessment')
+    else:
+        form = AssessmentQuestionForm(next_question)
+    
+    total_questions = AssessmentQuestion.objects.filter(is_active=True).count()
+    answered_count = answered_questions.count()
+
+    library_files_by_category = {}
+    for library_file in AssessmentLibraryFile.objects.filter(is_active=True).select_related('uploaded_by'):
+        library_files_by_category.setdefault(
+            library_file.get_course_category_display(),
+            []
+        ).append(library_file)
+    
+    context = {
+        'form': form,
+        'question': next_question,
+        'current_question': answered_count + 1,
+        'total_questions': total_questions,
+        'library_files_by_category': library_files_by_category,
+    }
+    return render(request, 'assessment/take_assessment.html', context)
+
+
+@login_required(login_url='login')
+def assessment_results(request):
+    """Display assessment results"""
+    student = request.user
+    assessment = StudentAssessment.objects.filter(student=student).first()
+    
+    if not assessment or assessment.status != 'completed':
+        messages.warning(request, 'Please complete the assessment first.')
+        return redirect('start_assessment')
+    
+    recommendation = CareerRecommendation.objects.filter(student=student).first()
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    
+    context = {
+        'assessment': assessment,
+        'recommendation': recommendation,
+        'skill_profile': skill_profile,
+    }
+    return render(request, 'assessment/results.html', context)
+
+
+@login_required(login_url='login')
+def view_career_recommendations(request):
+    """View career recommendations"""
+    student = request.user
+    recommendation = CareerRecommendation.objects.filter(student=student).first()
+    
+    if not recommendation:
+        messages.warning(request, 'No recommendations yet. Please complete the assessment.')
+        return redirect('start_assessment')
+    
+    # Get related in-demand careers
+    career_paths = recommendation.career_paths.all()
+    related_in_demand = InDemandCareer.objects.filter(
+        related_careers__in=career_paths
+    ).distinct()
+    
+    context = {
+        'recommendation': recommendation,
+        'career_paths': career_paths,
+        'related_in_demand': related_in_demand,
+    }
+    return render(request, 'career/recommendations.html', context)
+
+
+@login_required(login_url='login')
+@never_cache
+def academic_forecast(request):
+    """Generate or view academic forecast"""
+    student = request.user
+    
+    if request.method == 'POST':
+        form = CareerPathSelectionForm(request.POST)
+        if form.is_valid():
+            selected_path = form.cleaned_data['career_path']
+            
+            # Generate forecast
+            forecast, created = AcademicForecast.objects.update_or_create(
+                student=student,
+                defaults={
+                    'selected_career_path': selected_path,
+                    'predicted_success_rate': generate_success_prediction(student, selected_path),
+                }
+            )
+            
+            # Set improvement areas and recommended subjects
+            improvement_areas = get_improvement_areas(student, selected_path)
+            forecast.set_improvement_areas(improvement_areas)
+            forecast.set_recommended_subjects(selected_path.get_courses())
+            forecast.save()
+            
+            messages.success(request, 'Academic forecast generated!')
+            return redirect('view_academic_forecast')
+    else:
+        form = CareerPathSelectionForm()
+    
+    context = {'form': form}
+    return render(request, 'forecast/academic_forecast.html', context)
+
+
+@login_required(login_url='login')
+def view_academic_forecast(request):
+    """View academic forecast results"""
+    student = request.user
+    forecast = AcademicForecast.objects.filter(student=student).first()
+    
+    if not forecast:
+        messages.warning(request, 'No forecast yet. Please select a career path.')
+        return redirect('academic_forecast')
+    
+    context = {
+        'forecast': forecast,
+        'improvement_areas': forecast.get_improvement_areas(),
+        'recommended_subjects': forecast.get_recommended_subjects(),
+        'required_skills': forecast.selected_career_path.get_required_skills() if forecast.selected_career_path else []
+    }
+    return render(request, 'forecast/forecast_results.html', context)
+
+
+@login_required(login_url='login')
+def qr_profile(request):
+    """Display student QR profile"""
+    student = request.user
+
+    if not student.qr_code:
+        student.qr_code = uuid.uuid4()
+        student.save(update_fields=['qr_code'])
+    
+    # Get all student data
+    assessment = StudentAssessment.objects.filter(student=student).first()
+    recommendation = CareerRecommendation.objects.filter(student=student).first()
+    forecast = AcademicForecast.objects.filter(student=student).first()
+    qr_results_url = get_qr_results_url(request, student)
+    
+    context = {
+        'qr_code': student.generate_qr_code(qr_results_url),
+        'qr_results_url': qr_results_url,
+        'assessment': assessment,
+        'recommendation': recommendation,
+        'forecast': forecast,
+    }
+    return render(request, 'profile/qr_profile.html', context)
+
+
+def public_assessment_results(request, qr_code):
+    """Public QR destination for a student's completed assessment results."""
+    student = get_object_or_404(StudentUser, qr_code=qr_code)
+    assessment = StudentAssessment.objects.filter(student=student).first()
+    recommendation = CareerRecommendation.objects.filter(student=student).first()
+    forecast = AcademicForecast.objects.filter(student=student).first()
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+
+    response_details = []
+    if assessment:
+        for response in assessment.responses.select_related('question').order_by('question__order'):
+            options = response.question.get_normalized_options()
+            selected_answer = (
+                options[response.selected_option]['text']
+                if 0 <= response.selected_option < len(options)
+                else 'Answer unavailable'
+            )
+            response_details.append({
+                'response': response,
+                'selected_answer': selected_answer,
+                'points_earned': response.get_points_earned(),
+            })
+
+    context = {
+        'student': student,
+        'assessment': assessment,
+        'response_details': response_details,
+        'recommendation': recommendation,
+        'career_paths': recommendation.career_paths.all() if recommendation else [],
+        'forecast': forecast,
+        'skill_profile': skill_profile,
+        'skills': skill_profile.get_skills() if skill_profile else {},
+        'strengths': skill_profile.get_strengths() if skill_profile else [],
+        'weaknesses': skill_profile.get_weaknesses() if skill_profile else [],
+        'improvement_areas': forecast.get_improvement_areas() if forecast else [],
+        'recommended_subjects': forecast.get_recommended_subjects() if forecast else [],
+        'forecast_required_skills': (
+            forecast.selected_career_path.get_required_skills()
+            if forecast and forecast.selected_career_path else []
+        ),
+    }
+    return render(request, 'profile/public_assessment_results.html', context)
+
+
+@login_required(login_url='login')
+def view_in_demand_careers(request):
+    """View top in-demand careers"""
+    careers = InDemandCareer.objects.all()
+    
+    context = {'careers': careers}
+    return render(request, 'career/in_demand_careers.html', context)
+
+
+@login_required(login_url='login')
+def job_market_matching(request):
+    """Match student skills with in-demand careers"""
+    student = request.user
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    
+    if not skill_profile or not skill_profile.get_skills():
+        messages.warning(request, 'Please complete the assessment to see job matches.')
+        return redirect('start_assessment')
+    
+    # Get matching careers
+    all_careers = InDemandCareer.objects.all()
+    matched_careers = []
+    
+    for career in all_careers:
+        match_score = calculate_skill_match(skill_profile.get_skills(), career.required_skills)
+        matched_careers.append({
+            'career': career,
+            'match_score': match_score,
+        })
+    
+    # Sort by match score
+    matched_careers.sort(key=lambda x: x['match_score'], reverse=True)
+    
+    context = {'matched_careers': matched_careers}
+    return render(request, 'career/job_market_matching.html', context)
+
+
+# ===== ADMIN/COUNSELOR VIEWS =====
+
+@login_required(login_url='login')
+def counselor_dashboard(request):
+    """Counselor dashboard for monitoring students"""
+    if not request.user.is_staff:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('dashboard')
+    
+    # Get statistics
+    total_students = StudentUser.objects.filter(is_superuser=False, is_staff=False).count()
+    completed_assessments = StudentAssessment.objects.filter(status='completed').count()
+    flagged_reports = StudentReport.objects.filter(is_flagged=True).count()
+    
+    # Get recent reports
+    recent_reports = StudentReport.objects.all().order_by('-updated_at')[:10]
+    
+    context = {
+        'total_students': total_students,
+        'completed_assessments': completed_assessments,
+        'flagged_reports': flagged_reports,
+        'recent_reports': recent_reports,
+    }
+    return render(request, 'admin/counselor_dashboard.html', context)
+
+
+@login_required(login_url='login')
+@never_cache
+def student_report(request, student_id):
+    """View detailed student report"""
+    if not request.user.is_staff:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('dashboard')
+    
+    student = get_object_or_404(StudentUser, id=student_id)
+    report = StudentReport.objects.get(student=student)
+    assessment = StudentAssessment.objects.filter(student=student).first()
+    recommendation = CareerRecommendation.objects.filter(student=student).first()
+    forecast = AcademicForecast.objects.filter(student=student).first()
+    
+    if request.method == 'POST':
+        form = CounselorNotesForm(request.POST)
+        if form.is_valid():
+            report.counselor_notes = form.cleaned_data['notes']
+            report.is_flagged = form.cleaned_data['is_flagged']
+            report.save()
+            messages.success(request, 'Notes updated successfully!')
+    else:
+        form = CounselorNotesForm(initial={
+            'notes': report.counselor_notes,
+            'is_flagged': report.is_flagged,
+        })
+    
+    context = {
+        'student': student,
+        'report': report,
+        'assessment': assessment,
+        'recommendation': recommendation,
+        'forecast': forecast,
+        'forecast_improvement_areas': forecast.get_improvement_areas() if forecast else [],
+        'forecast_recommended_subjects': forecast.get_recommended_subjects() if forecast else [],
+        'form': form,
+    }
+    return render(request, 'admin/student_report.html', context)
+
+
+@login_required(login_url='login')
+def students_list(request):
+    """List all students for counselor/admin"""
+    if not request.user.is_staff:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('dashboard')
+    
+    students = StudentUser.objects.filter(is_superuser=False, is_staff=False).order_by('-date_joined')
+    
+    # Filter by assessment status
+    status = request.GET.get('status')
+    if status:
+        if status == 'completed':
+            students = students.filter(assessment__status='completed')
+        elif status == 'pending':
+            students = students.filter(
+                Q(assessment__status='in_progress') | Q(assessment__isnull=True)
+            )
+    
+    context = {'students': students}
+    return render(request, 'admin/students_list.html', context)
+
+
+@login_required(login_url='login')
+@never_cache
+def assessment_tests_admin(request):
+    """Staff interface for managing assessment library files."""
+    if not request.user.is_staff:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('dashboard')
+
+    library_form = AssessmentLibraryFileForm(initial={'is_active': True})
+
+    if request.method == 'POST' and request.POST.get('form_type') == 'library_file':
+        library_form = AssessmentLibraryFileForm(request.POST, request.FILES)
+        if library_form.is_valid():
+            library_file = library_form.save(commit=False)
+            library_file.uploaded_by = request.user
+            library_file.save()
+            messages.success(request, f'"{library_file.title}" was added to the assessment library.')
+            return redirect('/counselor/assessment-tests/')
+        messages.error(request, 'Please correct the library file form below.')
+    elif request.method == 'POST':
+        messages.error(request, 'Adding assessment tests is disabled on this page.')
+        return redirect('/counselor/assessment-tests/')
+
+    files_by_category = {}
+    for library_file in AssessmentLibraryFile.objects.select_related('uploaded_by'):
+        files_by_category.setdefault(library_file.get_course_category_display(), []).append(library_file)
+
+    context = {
+        'library_form': library_form,
+        'files_by_category': files_by_category,
+        'file_count': AssessmentLibraryFile.objects.count(),
+        'active_file_count': AssessmentLibraryFile.objects.filter(is_active=True).count(),
+        'library_category_count': len(files_by_category),
+    }
+    return render(request, 'admin/assessment_tests.html', context)
+
+
+@login_required(login_url='login')
+@require_http_methods(["POST"])
+@csrf_protect
+def toggle_assessment_library_file_status(request, file_id):
+    if not request.user.is_staff:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('dashboard')
+
+    library_file = get_object_or_404(AssessmentLibraryFile, id=file_id)
+    library_file.is_active = not library_file.is_active
+    library_file.save(update_fields=['is_active'])
+
+    status_label = 'activated' if library_file.is_active else 'archived'
+    messages.success(request, f'"{library_file.title}" {status_label}.')
+    return redirect('/counselor/assessment-tests/')
+
+
+# ===== HELPER FUNCTIONS =====
+
+def calculate_assessment_score(assessment):
+    """Calculate total assessment score"""
+    responses = AssessmentResponse.objects.filter(assessment=assessment)
+    total_score = 0
+    
+    for response in responses:
+        points = response.get_points_earned()
+        if isinstance(points, dict):
+            total_score += sum(points.values())
+    
+    return total_score
+
+
+def generate_career_recommendations(student, assessment):
+    """Generate AI-based career recommendations"""
+    # Aggregate skill scores from responses
+    skill_scores = {}
+    responses = AssessmentResponse.objects.filter(assessment=assessment)
+    
+    for response in responses:
+        points = response.get_points_earned()
+        if isinstance(points, dict):
+            for skill, score in points.items():
+                skill_scores[skill] = skill_scores.get(skill, 0) + score
+    
+    # Find matching career paths
+    career_paths = CareerPath.objects.all()
+    recommendations = []
+    
+    for path in career_paths:
+        match_score = 0
+        required_skills = path.get_required_skills()
+        
+        for skill in required_skills:
+            if skill in skill_scores:
+                match_score += skill_scores[skill]
+        
+        if match_score > 0:
+            recommendations.append((path, match_score))
+    
+    # Sort and take top 3
+    recommendations.sort(key=lambda x: x[1], reverse=True)
+    top_paths = [x[0] for x in recommendations[:3]]
+    
+    # Calculate compatibility score
+    if recommendations:
+        total_possible = len(top_paths) * max([x[1] for x in recommendations])
+        actual_score = sum([x[1] for x in recommendations[:3]])
+        compatibility_score = (actual_score / total_possible * 100) if total_possible > 0 else 0
+    else:
+        compatibility_score = 0
+    
+    # Update skill profile
+    skill_profile, _ = StudentSkillProfile.objects.get_or_create(student=student)
+    skill_profile.set_skills(skill_scores)
+    strength_list = sorted(skill_scores.items(), key=lambda x: x[1], reverse=True)[:5]
+    skill_profile.set_strengths(strength_list)
+    skill_profile.save()
+    
+    # Create or update recommendation
+    recommendation, _ = CareerRecommendation.objects.update_or_create(
+        student=student,
+        defaults={
+            'recommendation_text': generate_recommendation_text(top_paths),
+            'compatibility_score': min(compatibility_score, 100),
+        }
+    )
+    recommendation.career_paths.set(top_paths)
+
+
+def generate_recommendation_text(career_paths):
+    """Generate descriptive recommendation text"""
+    if not career_paths:
+        return "Based on your assessment, we recommend exploring various career paths."
+    
+    path_names = ', '.join([p.name for p in career_paths])
+    return f"Based on your assessment results, we recommend the following career paths: {path_names}. These paths align with your identified skills and interests."
+
+
+def generate_success_prediction(student, career_path):
+    """Predict student's success in a career path"""
+    assessment = StudentAssessment.objects.filter(student=student).first()
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    
+    if not assessment or not skill_profile:
+        return 50.0
+    
+    # Calculate based on skill matching and assessment score
+    base_score = 50
+    
+    # Add points based on skill match
+    skill_match = calculate_skill_match(skill_profile.get_skills(), career_path.required_skills)
+    base_score += skill_match / 2
+    
+    # Add points based on assessment performance
+    if assessment.total_score:
+        base_score += min((assessment.total_score / 1000) * 10, 20)  # Max 20 points
+    
+    return min(base_score, 100)
+
+
+def get_improvement_areas(student, career_path):
+    """Identify areas for improvement"""
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    
+    if not skill_profile:
+        return career_path.get_required_skills()
+    
+    improvements = []
+    required_skills = career_path.get_required_skills()
+    student_skills = skill_profile.get_skills()
+    
+    for req_skill in required_skills:
+        if req_skill not in student_skills or student_skills.get(req_skill, 0) < 60:
+            improvements.append(req_skill)
+    
+    return improvements[:5]
+
+
+def calculate_skill_match(student_skills, required_skills_json_str):
+    """Calculate percentage match between student skills and required skills"""
+    if isinstance(required_skills_json_str, str):
+        import json
+        try:
+            required_skills = json.loads(required_skills_json_str)
+        except:
+            required_skills = []
+    else:
+        required_skills = required_skills_json_str
+    
+    if not required_skills:
+        return 0
+    
+    matches = 0
+    for skill in required_skills:
+        if skill in student_skills:
+            matches += 1
+    
+    return (matches / len(required_skills)) * 100

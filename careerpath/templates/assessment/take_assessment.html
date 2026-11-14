@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Career Assessment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 20px;">
+                <div class="card-header bg-primary text-white">
+                    <strong>Progress</strong>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar" style="width: {{ current_question|add:0 }}%">
+                            {{ current_question }}/{{ total_questions }}
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0">
+                        <small>Question {{ current_question }} of {{ total_questions }}</small>
+                    </p>
+                </div>
+            </div>
+
+            {% if library_files_by_category %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-dark text-white">
+                    <strong>Assessment Library</strong>
+                </div>
+                <div class="card-body">
+                    {% for category, files in library_files_by_category.items %}
+                        <div class="mb-3">
+                            <h6 class="mb-2">{{ category }}</h6>
+                            {% for library_file in files %}
+                                <div class="border rounded p-2 mb-2 bg-light">
+                                    <strong class="d-block small">{{ library_file.title }}</strong>
+                                    {% if library_file.description %}
+                                        <span class="d-block text-muted small mb-2">{{ library_file.description }}</span>
+                                    {% endif %}
+                                    {% if library_file.file %}
+                                        <a href="{{ library_file.file.url }}" class="btn btn-outline-primary btn-sm w-100" target="_blank" rel="noopener">
+                                            <i class="fas fa-file-arrow-down me-1"></i>Open File
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-9">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-5">
+                    <h5 class="card-title mb-4">{{ question.get_question_type_display }} - {{ question.category }}</h5>
+                    
+                    <form method="post" class="assessment-form">
+                        {% csrf_token %}
+                        
+                        <div class="question-container">
+                            <h6 class="mb-4">{{ question.question_text }}</h6>
+                            
+                            {% if form.non_field_errors %}
+                            <div class="alert alert-danger" role="alert">
+                                {{ form.non_field_errors }}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="options-container">
+                                {% for field in form %}
+                                    {% if field.name == 'answer' %}
+                                        {% for option in field %}
+                                            <div class="form-check mb-3">
+                                                {{ option.tag }}
+                                                <label class="form-check-label ms-3">
+                                                    {{ option.choice_label }}
+                                                </label>
+                                            </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mt-4 d-flex justify-content-between">
+                            {% if current_question > 1 %}
+                            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Dashboard
+                            </a>
+                            {% endif %}
+                            
+                            <button type="submit" class="btn btn-primary">
+                                {% if current_question == total_questions %}
+                                    Complete Assessment <i class="fas fa-check"></i>
+                                {% else %}
+                                    Next Question <i class="fas fa-arrow-right"></i>
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .options-container .form-check {
+        padding: 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .options-container .form-check:hover {
+        border-color: #007BFF;
+        background-color: #f8f9fa;
+    }
+    
+    .options-container input[type="radio"]:checked + label {
+        font-weight: bold;
+    }
+</style>
+{% endblock %}

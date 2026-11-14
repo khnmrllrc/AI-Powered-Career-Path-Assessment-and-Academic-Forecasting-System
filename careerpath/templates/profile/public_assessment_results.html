@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+
+{% block title %}Assessment Results - {{ student.first_name }} {{ student.last_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-9 mx-auto">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>Assessment Results</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+                        <div>
+                            <h4 class="mb-1">{{ student.first_name }} {{ student.last_name }}</h4>
+                            <p class="text-muted mb-0">Student ID: {{ student.student_id }}</p>
+                        </div>
+                        {% if assessment %}
+                            <span class="badge {% if assessment.status == 'completed' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ assessment.get_status_display }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">No Assessment</span>
+                        {% endif %}
+                    </div>
+
+                    {% if assessment and assessment.status == 'completed' %}
+                    <div class="row text-center mb-4">
+                        <div class="col-md-4 mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="text-muted">Total Score</h6>
+                                <h3 class="text-primary mb-0">{{ assessment.total_score|floatformat:0 }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="text-muted">Questions Answered</h6>
+                                <h3 class="text-info mb-0">{{ assessment.responses.count }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="text-muted">Compatibility</h6>
+                                <h3 class="text-success mb-0">
+                                    {% if recommendation %}{{ recommendation.compatibility_score|floatformat:1 }}%{% else %}-{% endif %}
+                                </h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-muted small">Completed {{ assessment.completed_at|date:"F j, Y" }}</p>
+
+                    {% if skills %}
+                    <section class="mb-4">
+                        <h5 class="mb-3">Assessment Skills</h5>
+                        {% for skill, score in skills.items %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <strong>{{ skill }}</strong>
+                                <span>{{ score|floatformat:0 }}%</span>
+                            </div>
+                            <div class="progress" role="progressbar" aria-label="{{ skill }} score" aria-valuenow="{{ score }}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="width: {{ score }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if strengths %}
+                        <h6 class="mt-3">Top Strengths</h6>
+                        <ul class="mb-0">
+                            {% for strength in strengths %}
+                            <li>{{ strength.0 }} — {{ strength.1|floatformat:1 }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                        {% if weaknesses %}
+                        <h6 class="mt-3">Areas to Improve</h6>
+                        <ul class="mb-0">
+                            {% for weakness in weaknesses %}<li>{{ weakness }}</li>{% endfor %}
+                        </ul>
+                        {% endif %}
+                    </section>
+                    {% endif %}
+
+                    <section class="mb-4">
+                        <h5 class="mb-3">Assessment Responses</h5>
+                        {% for item in response_details %}
+                        <div class="border rounded p-3 mb-3">
+                            <div class="d-flex justify-content-between gap-3">
+                                <strong>Question {{ item.response.question.order }}</strong>
+                                <span class="badge bg-secondary">{{ item.response.question.get_question_type_display }}</span>
+                            </div>
+                            <p class="mb-2 mt-2">{{ item.response.question.question_text }}</p>
+                            <p class="mb-1"><strong>Your answer:</strong> {{ item.selected_answer }}</p>
+                            {% if item.points_earned %}
+                            <div class="small text-muted">
+                                <strong>Points:</strong>
+                                {% for skill, points in item.points_earned.items %}
+                                <span class="badge bg-light text-dark">{{ skill }}: {{ points }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">No individual responses are available.</p>
+                        {% endfor %}
+                    </section>
+
+                    {% if recommendation %}
+                    <h5 class="mb-3">Recommended Career Paths</h5>
+                    <div class="alert alert-info">
+                        <p class="mb-2">{{ recommendation.recommendation_text }}</p>
+                        <strong>Compatibility:</strong> {{ recommendation.compatibility_score|floatformat:1 }}%
+                    </div>
+
+                    <div class="row">
+                        {% for path in career_paths %}
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-3 h-100">
+                                <h6 class="mb-2">{{ path.name }}</h6>
+                                <span class="badge bg-secondary mb-2">{{ path.get_category_display }}</span>
+                                <p class="text-muted small">{{ path.description }}</p>
+                                <h6 class="small">Required Skills</h6>
+                                {% for skill in path.get_required_skills %}
+                                <span class="badge bg-light text-dark mb-1">{{ skill }}</span>
+                                {% empty %}<span class="text-muted small">Not specified</span>{% endfor %}
+                                {% if path.get_courses %}
+                                <h6 class="small mt-3">Recommended Courses</h6>
+                                <ul class="small mb-0">
+                                    {% for course in path.get_courses %}<li>{{ course }}</li>{% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12">
+                            <p class="text-muted">No specific career paths were linked to this recommendation.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning mb-0">
+                        No career recommendation is available yet.
+                    </div>
+                    {% endif %}
+
+                    {% if forecast %}
+                    <h5 class="mt-4 mb-3">Academic Forecast</h5>
+                    <div class="border rounded p-3 bg-light">
+                        <p class="mb-1"><strong>Selected Career Path:</strong> {{ forecast.selected_career_path|default:"Not selected" }}</p>
+                        <p class="mb-1"><strong>Predicted Success Rate:</strong> {{ forecast.predicted_success_rate|floatformat:1 }}%</p>
+                        <p class="text-muted small">Forecast generated {{ forecast.forecast_date|date:"F j, Y" }}</p>
+                        {% if recommended_subjects %}
+                        <h6>Recommended Courses</h6>
+                        <ul>{% for subject in recommended_subjects %}<li>{{ subject }}</li>{% endfor %}</ul>
+                        {% endif %}
+                        {% if improvement_areas %}
+                        <h6>Areas for Improvement</h6>
+                        <ul>{% for area in improvement_areas %}<li>{{ area }}</li>{% endfor %}</ul>
+                        {% endif %}
+                        {% if forecast_required_skills %}
+                        <h6>Career Path Skills</h6>
+                        {% for skill in forecast_required_skills %}<span class="badge bg-light text-dark me-1">{{ skill }}</span>{% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="alert alert-warning mb-0">
+                        This student's assessment results are not available yet.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

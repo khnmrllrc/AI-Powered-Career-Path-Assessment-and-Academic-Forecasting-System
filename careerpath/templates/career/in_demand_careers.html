@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}In-Demand Careers{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-2">Top In-Demand Careers</h1>
+    <p class="text-muted mb-4">Explore the top 20 most in-demand careers in the current job market</p>
+
+    {% if careers %}
+    <div class="row">
+        {% for career in careers %}
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">#{career.rank} - {{ career.title }}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ career.description }}</p>
+
+                    <div class="row mt-3 text-center">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Avg. Salary</small>
+                            <strong>{{ career.average_salary }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Job Growth</small>
+                            <strong class="text-success">{{ career.job_growth }}</strong>
+                        </div>
+                    </div>
+
+                    {% if career.required_skills %}
+                    <div class="mt-3">
+                        <h6>Required Skills</h6>
+                        <div>
+                            {% for skill in career.required_skills %}
+                                <span class="badge bg-light text-dark me-2 mb-2">{{ skill }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if career.related_careers.all %}
+                    <div class="mt-3">
+                        <h6>Related Career Paths</h6>
+                        <div>
+                            {% for path in career.related_careers.all %}
+                                <span class="badge bg-secondary me-2 mb-2">{{ path.name }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <p>No in-demand careers data available yet.</p>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

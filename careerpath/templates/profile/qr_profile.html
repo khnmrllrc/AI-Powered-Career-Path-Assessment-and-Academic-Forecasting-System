@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}QR Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 mx-auto qr-profile-column">
+            <div class="card border-0 shadow-sm text-center qr-profile-card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-qrcode"></i> Your QR Profile</h5>
+                </div>
+                <div class="card-body p-4">
+                    <h6 class="mb-4">Student: {{ user.first_name }} {{ user.last_name }}</h6>
+                    <p class="text-muted mb-3">Student ID: {{ user.student_id }}</p>
+
+                    <!-- QR Code -->
+                    <div class="mb-4 p-3 bg-light rounded qr-code-container">
+                        <img src="{{ qr_code }}" alt="QR Code" class="img-fluid qr-code-image" style="max-width: 300px;">
+                    </div>
+
+                    <p class="text-muted small qr-profile-share-note">
+                        <i class="fas fa-info-circle"></i>
+                        Share this QR code for quick access to your assessment results and recommended career paths.
+                    </p>
+                    <p class="text-muted small mb-0">{{ qr_results_url }}</p>
+
+                    <!-- Profile Summary -->
+                    <hr class="qr-profile-summary">
+
+                    <div class="qr-profile-summary">
+                    <h6 class="mt-4 mb-3">Profile Summary</h6>
+
+                    {% if assessment %}
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Assessment Status</small>
+                            <strong>
+                                <span class="badge {% if assessment.status == 'completed' %}bg-success{% else %}bg-warning{% endif %}">
+                                    {{ assessment.get_status_display }}
+                                </span>
+                            </strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Assessment Score</small>
+                            <strong>{{ assessment.total_score|floatformat:0 }}</strong>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if recommendation %}
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Recommendations</small>
+                            <strong>{{ recommendation.career_paths.count }} paths</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Compatibility</small>
+                            <strong>{{ recommendation.compatibility_score|floatformat:1 }}%</strong>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if forecast %}
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Career Path</small>
+                            <strong class="small">{{ forecast.selected_career_path }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Success Prediction</small>
+                            <strong>{{ forecast.predicted_success_rate|floatformat:1 }}%</strong>
+                        </div>
+                    </div>
+                    {% endif %}
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="mt-4 gap-2 d-flex flex-column qr-profile-actions">
+                        <a href="{% url 'dashboard' %}" class="btn btn-primary">
+                            <i class="fas fa-home"></i> Back to Dashboard
+                        </a>
+                        <button onclick="window.print()" class="btn btn-outline-secondary">
+                            <i class="fas fa-print"></i> Print QR Profile
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style media="print">
+    @page {
+        margin: 12mm;
+    }
+
+    html,
+    body {
+        min-height: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+        overflow: visible !important;
+    }
+
+    .sidebar-backdrop,
+    .app-sidebar,
+    .mobile-topbar,
+    footer,
+    .qr-profile-summary,
+    .qr-profile-actions {
+        display: none !important;
+    }
+
+    .app-shell,
+    .app-main {
+        width: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+        overflow: visible !important;
+    }
+
+    .page-content {
+        padding: 0 !important;
+    }
+
+    .content-panel {
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+    }
+
+    .qr-profile-column {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+
+    .qr-profile-card {
+        width: 100% !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+    }
+
+    .qr-profile-card .card-header {
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .qr-code-container {
+        display: inline-block;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    .qr-code-image {
+        display: block;
+        width: 70mm;
+        max-width: 70mm !important;
+        height: auto;
+        image-rendering: pixelated;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+</style>
+{% endblock %}

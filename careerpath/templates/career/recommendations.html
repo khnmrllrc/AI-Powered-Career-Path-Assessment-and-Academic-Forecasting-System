@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Career Recommendations{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Your Career Recommendations</h1>
+
+    {% if recommendation %}
+    <div class="row">
+        <!-- Main Recommendation -->
+        <div class="col-md-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-lightbulb"></i> Based on Your Assessment
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ recommendation.recommendation_text }}</p>
+                    <div class="mt-3">
+                        <h6>Compatibility Score</h6>
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar bg-success" style="width: {{ recommendation.compatibility_score }}%">
+                                {{ recommendation.compatibility_score|floatformat:1 }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommended Career Paths -->
+        <div class="col-md-12 mb-4">
+            <h4 class="mb-3">Recommended Career Paths</h4>
+        </div>
+
+        {% for path in career_paths %}
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">{{ path.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ path.description }}</p>
+                    
+                    <div class="mt-3">
+                        <h6>Category</h6>
+                        <p><span class="badge bg-secondary">{{ path.get_category_display }}</span></p>
+                    </div>
+
+                    <div class="mt-3">
+                        <h6>Required Skills</h6>
+                        <div>
+                            {% for skill in path.required_skills %}
+                                <span class="badge bg-light text-dark me-2 mb-2">{{ skill }}</span>
+                            {% empty %}
+                                <span class="text-muted">No specific skills listed</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% if path.courses %}
+                    <div class="mt-3">
+                        <h6>Recommended Courses</h6>
+                        <ul class="list-unstyled">
+                            {% for course in path.courses %}
+                                <li><small>• {{ course }}</small></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-3">
+                        <a href="{% url 'academic_forecast' %}" class="btn btn-sm btn-primary">
+                            Get Forecast for This Path
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Related In-Demand Careers -->
+        {% if related_in_demand %}
+        <div class="col-md-12 mb-4 mt-4">
+            <h4 class="mb-3">Related In-Demand Careers</h4>
+        </div>
+
+        {% for career in related_in_demand %}
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    #{career.rank} {{ career.title }}
+                </div>
+                <div class="card-body">
+                    <p class="card-text small">{{ career.description|truncatewords:20 }}</p>
+                    <p class="mb-0"><small><strong>Job Growth:</strong> {{ career.job_growth }}</small></p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <p>No recommendations yet. Please complete the assessment first.</p>
+        <a href="{% url 'start_assessment' %}" class="btn btn-primary">Start Assessment</a>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

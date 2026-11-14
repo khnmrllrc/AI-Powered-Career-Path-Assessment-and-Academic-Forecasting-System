@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Assessment Library{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1>Assessment Library</h1>
+            <p class="text-muted mb-0">Upload and organize files for assessment distribution by course category.</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <a href="{% url 'counselor_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-folder"></i> Total Files
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-1">{{ file_count }}</h2>
+                    <p class="text-muted mb-0">Materials in the library</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-circle-check"></i> Active Files
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-1">{{ active_file_count }}</h2>
+                    <p class="text-muted mb-0">Available during assessment</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-layer-group"></i> Course Categories
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-1">{{ library_category_count }}</h2>
+                    <p class="text-muted mb-0">Categories with uploaded files</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-5 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <i class="fas fa-upload me-2"></i>Add Library File
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="library_file">
+
+                        {% if library_form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ library_form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ library_form.title.id_for_label }}">{{ library_form.title.label }}</label>
+                            {{ library_form.title }}
+                            {% if library_form.title.errors %}<div class="text-danger small mt-1">{{ library_form.title.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ library_form.course_category.id_for_label }}">Course Category</label>
+                            {{ library_form.course_category }}
+                            {% if library_form.course_category.errors %}<div class="text-danger small mt-1">{{ library_form.course_category.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ library_form.description.id_for_label }}">{{ library_form.description.label }}</label>
+                            {{ library_form.description }}
+                            {% if library_form.description.errors %}<div class="text-danger small mt-1">{{ library_form.description.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ library_form.file.id_for_label }}">{{ library_form.file.label }}</label>
+                            {{ library_form.file }}
+                            {% if library_form.file.errors %}<div class="text-danger small mt-1">{{ library_form.file.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="form-check mb-3">
+                            {{ library_form.is_active }}
+                            <label class="form-check-label" for="{{ library_form.is_active.id_for_label }}">{{ library_form.is_active.label }}</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Add File
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7 mb-4">
+            {% for category, files in files_by_category.items %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-folder-open me-2"></i>{{ category }}</span>
+                    <span class="badge bg-light text-dark">{{ files|length }} file{{ files|length|pluralize }}</span>
+                </div>
+                <div class="card-body">
+                    {% for library_file in files %}
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <h6 class="mb-1">{{ library_file.title }}</h6>
+                                <p class="text-muted small mb-2">
+                                    {{ library_file.filename }} | Uploaded {{ library_file.created_at|date:"M d, Y" }}
+                                </p>
+                                {% if library_file.description %}
+                                    <p class="mb-2">{{ library_file.description }}</p>
+                                {% endif %}
+                                <span class="badge {% if library_file.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {% if library_file.is_active %}Active{% else %}Archived{% endif %}
+                                </span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                {% if library_file.file %}
+                                <a href="{{ library_file.file.url }}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">
+                                    <i class="fas fa-download me-1"></i>Open
+                                </a>
+                                {% endif %}
+                                <form method="post" action="{% url 'toggle_assessment_library_file_status' library_file.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                        {% if library_file.is_active %}Archive{% else %}Activate{% endif %}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <p class="text-muted mb-0">No assessment library files have been added yet.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

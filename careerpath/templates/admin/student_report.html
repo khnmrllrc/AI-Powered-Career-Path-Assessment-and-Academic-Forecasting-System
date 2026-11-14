@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Report - {{ student.first_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h1>{{ student.first_name }} {{ student.last_name }}</h1>
+            <p class="text-muted mb-0">Student ID: {{ student.student_id }}</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <a href="{% url 'students_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Students
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-id-card"></i> Student Profile
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Name:</strong> {{ student.first_name }} {{ student.middle_name }} {{ student.last_name }} {{ student.suffix }}</p>
+                    <p class="mb-2"><strong>Email:</strong> {{ student.email }}</p>
+                    <p class="mb-0"><strong>Joined:</strong> {{ student.date_joined|date:"M d, Y" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-edit"></i> Assessment Status
+                </div>
+                <div class="card-body">
+                    {% if assessment %}
+                        <p class="mb-2">
+                            <strong>Status:</strong>
+                            <span class="badge {% if assessment.status == 'completed' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ assessment.get_status_display }}
+                            </span>
+                        </p>
+                        <p class="mb-2"><strong>Score:</strong> {{ assessment.total_score|default:"-" }}</p>
+                        <p class="mb-0"><strong>Completed On:</strong> {{ assessment.completed_at|date:"M d, Y"|default:"-" }}</p>
+                    {% else %}
+                        <p class="text-muted mb-0">Assessment not started yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header {% if report.is_flagged %}bg-warning text-dark{% else %}bg-info text-white{% endif %}">
+                    <i class="fas fa-flag"></i> Follow-up Status
+                </div>
+                <div class="card-body">
+                    {% if report.is_flagged %}
+                        <p class="mb-2"><span class="badge bg-danger">Flagged for Follow-up</span></p>
+                        <p class="text-muted mb-0">This student report currently needs counselor attention.</p>
+                    {% else %}
+                        <p class="mb-2"><span class="badge bg-success">Clear</span></p>
+                        <p class="text-muted mb-0">No follow-up flag has been set for this report.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            {% if recommendation %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-lightbulb"></i> Career Recommendations
+                </div>
+                <div class="card-body">
+                    <p>{{ recommendation.recommendation_text }}</p>
+                    <p class="mb-3"><strong>Compatibility Score:</strong> {{ recommendation.compatibility_score|floatformat:1 }}%</p>
+                    <div>
+                        {% for path in recommendation.career_paths.all %}
+                            <span class="badge bg-secondary me-2 mb-2">{{ path.name }}</span>
+                        {% empty %}
+                            <span class="text-muted">No recommended paths yet.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if forecast %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-chart-line"></i> Academic Forecast
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Selected Career Path:</strong> {{ forecast.selected_career_path }}</p>
+                    <p class="mb-2"><strong>Predicted Success Rate:</strong></p>
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar" role="progressbar" style="width: {{ forecast.predicted_success_rate }}%;" aria-valuenow="{{ forecast.predicted_success_rate }}" aria-valuemin="0" aria-valuemax="100">
+                            {{ forecast.predicted_success_rate|floatformat:1 }}%
+                        </div>
+                    </div>
+
+                    <p class="mb-2"><strong>Areas for Improvement:</strong></p>
+                    <ul class="mb-3">
+                        {% for area in forecast_improvement_areas %}
+                            <li>{{ area }}</li>
+                        {% empty %}
+                            <li class="text-muted">No improvement areas identified yet.</li>
+                        {% endfor %}
+                    </ul>
+
+                    <p class="mb-2"><strong>Recommended Subjects:</strong></p>
+                    <div>
+                        {% for subject in forecast_recommended_subjects %}
+                            <span class="badge bg-secondary me-2 mb-2">{{ subject }}</span>
+                        {% empty %}
+                            <span class="text-muted">No recommended subjects available.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-sticky-note"></i> Counselor Notes
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.notes.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="form-check mb-3">
+                            {{ form.is_flagged }}
+                            <label class="form-check-label" for="{{ form.is_flagged.id_for_label }}">
+                                {{ form.is_flagged.label }}
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-save me-2"></i>Save Notes
+                        </button>
+                    </form>
+
+                    {% if report.counselor_notes %}
+                    <div class="mt-4">
+                        <h6>Current Notes</h6>
+                        <p class="bg-light p-3 rounded mb-0">{{ report.counselor_notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

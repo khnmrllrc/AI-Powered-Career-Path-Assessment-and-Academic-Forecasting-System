@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Job Market Matching{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-2">Your Job Market Matching</h1>
+    <p class="text-muted mb-4">See how your skills match with the top in-demand careers</p>
+
+    {% if matched_careers %}
+    <div class="row">
+        {% for item in matched_careers %}
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header" style="background-color: {% if item.match_score >= 80 %}#28a745{% elif item.match_score >= 60 %}#ffc107{% else %}#dc3545{% endif %}; color: white;">
+                    <h6 class="mb-0">#{item.career.rank} - {{ item.career.title }}</h6>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ item.career.description|truncatewords:30 }}</p>
+
+                    <div class="mt-3">
+                        <h6>Your Skill Match</h6>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar" 
+                                 style="width: {{ item.match_score }}%; 
+                                        background-color: {% if item.match_score >= 80 %}#28a745{% elif item.match_score >= 60 %}#ffc107{% else %}#dc3545{% endif %};">
+                                {{ item.match_score|floatformat:0 }}%
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3 text-center">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Avg. Salary</small>
+                            <strong>{{ item.career.average_salary }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Job Growth</small>
+                            <strong class="text-success">{{ item.career.job_growth }}</strong>
+                        </div>
+                    </div>
+
+                    {% if item.career.required_skills %}
+                    <div class="mt-3">
+                        <h6>Skills Needed</h6>
+                        <div>
+                            {% for skill in item.career.required_skills %}
+                                <span class="badge bg-light text-dark me-2 mb-2">{{ skill }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        <p>No matching data available. Please complete the assessment first.</p>
+        <a href="{% url 'start_assessment' %}" class="btn btn-primary">Start Assessment</a>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}
