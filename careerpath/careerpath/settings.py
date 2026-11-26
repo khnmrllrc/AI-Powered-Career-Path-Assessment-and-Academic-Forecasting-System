@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-development-only-change-before-deployment')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG =False 
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
@@ -41,6 +41,22 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Cloudflare Tunnel URL). Leave unset to use the current host/LAN fallback.
 QR_PUBLIC_BASE_URL = config('QR_PUBLIC_BASE_URL', default='').rstrip('/')
 
+# HTTPS and security settings
+SECURE_SSL_REDIRECT = config(
+    'SECURE_SSL_REDIRECT',
+    default=not DEBUG,
+    cast=bool,
+)
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+# Enable HSTS only after confirming HTTPS works correctly
+SECURE_HSTS_SECONDS = config(
+    'SECURE_HSTS_SECONDS',
+    default=0,
+    cast=int,
+)
 # Application definition
 
 INSTALLED_APPS = [
