@@ -25,7 +25,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('Populating In-Demand Careers...'))
             self.populate_in_demand_careers()
 
-            self.stdout.write(self.style.SUCCESS('✓ Initial data population completed!'))
+            self.stdout.write(self.style.SUCCESS('[OK] Initial data population completed!'))
 
     def populate_career_paths(self):
         """Populate career paths with skills and courses"""
@@ -149,7 +149,6 @@ class Command(BaseCommand):
                 name=data['name'],
                 defaults={
                     'category': data['category'],
-                    'career_categories': json.dumps(QUESTION_CAREER_CATEGORY_MAP.get(data['category'], [])),
                     'description': data['description'],
                     'success_rate': data['success_rate']
                 }
@@ -158,9 +157,9 @@ class Command(BaseCommand):
                 career.set_required_skills(data['required_skills'])
                 career.set_courses(data['courses'])
                 career.save()
-                self.stdout.write(f'  ✓ Created: {data["name"]}')
+                self.stdout.write(f'  [OK] Created: {data["name"]}')
             else:
-                self.stdout.write(f'  → Skipped: {data["name"]} (already exists)')
+                self.stdout.write(f'  [SKIP] {data["name"]} (already exists)')
 
     def populate_assessment_questions(self):
         """Populate assessment questions"""
@@ -271,21 +270,26 @@ class Command(BaseCommand):
         ]
 
         for data in questions_data:
+            career_categories = QUESTION_CAREER_CATEGORY_MAP.get(data['category'], [])
             question, created = AssessmentQuestion.objects.get_or_create(
                 question_text=data['question_text'],
                 question_type=data['question_type'],
                 defaults={
                     'category': data['category'],
+                    'career_categories': json.dumps(career_categories),
                     'order': data['order'],
                     'is_active': True
                 }
             )
+            if not created and question.get_career_categories() != career_categories:
+                question.set_career_categories(career_categories)
+                question.save(update_fields=['career_categories'])
             if created:
                 question.set_options(data['options'])
                 question.save()
-                self.stdout.write(f'  ✓ Created: {data["question_text"][:50]}...')
+                self.stdout.write(f'  [OK] Created: {data["question_text"][:50]}...')
             else:
-                self.stdout.write(f'  → Skipped: Question already exists')
+                self.stdout.write(f'  [SKIP] Question already exists')
 
     def populate_in_demand_careers(self):
         """Populate top 20 in-demand careers"""
@@ -465,6 +469,6 @@ class Command(BaseCommand):
             if created:
                 career.set_required_skills(data['required_skills'])
                 career.save()
-                self.stdout.write(f'  ✓ Created Rank #{data["rank"]}: {data["title"]}')
+                self.stdout.write(f'  [OK] Created Rank #{data["rank"]}: {data["title"]}')
             else:
-                self.stdout.write(f'  → Skipped: Rank #{data["rank"]} already exists')
+                self.stdout.write(f'  [SKIP] Rank #{data["rank"]} already exists')
