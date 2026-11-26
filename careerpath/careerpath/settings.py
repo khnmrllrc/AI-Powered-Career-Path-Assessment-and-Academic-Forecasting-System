@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-import os
+from decouple import Csv, config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,15 +21,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-development-only-change-before-deployment',
-)
+SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-development-only-change-before-deployment')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['yourstrulyke.pythonanywhere.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='khnmrllrc.pythonanywhere.com,localhost,127.0.0.1',
+    cast=Csv(),
+)
 
 # Cloudflare terminates HTTPS before forwarding requests to the local Django
 # server. Trust its forwarded protocol header so URLs embedded in QR codes keep
@@ -38,8 +39,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Optional public base URL used in QR codes (for example, a deployed domain or
 # Cloudflare Tunnel URL). Leave unset to use the current host/LAN fallback.
-QR_PUBLIC_BASE_URL = os.environ.get('QR_PUBLIC_BASE_URL', '').rstrip('/')
-
+QR_PUBLIC_BASE_URL = config('QR_PUBLIC_BASE_URL', default='').rstrip('/')
 
 # Application definition
 
