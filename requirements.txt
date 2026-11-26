@@ -1,4 +1,0 @@
-Django==5.2.13
-qrcode[pil]==8.2
-Pillow>=11.0.0
-python-decouple==3.8
