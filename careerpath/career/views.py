@@ -286,6 +286,10 @@ def start_assessment(request):
     
     total_questions = len(get_assessment_questions_for_category(assessment.career_category))
     answered_count = answered_questions.count()
+    assessment_library_files = AssessmentLibraryFile.objects.filter(
+        course_category=assessment.career_category,
+        is_active=True,
+    ).order_by('title')
 
     context = {
         'form': form,
@@ -293,6 +297,7 @@ def start_assessment(request):
         'current_question': answered_count + 1,
         'total_questions': total_questions,
         'career_category': assessment.get_career_category_display(),
+        'assessment_library_files': assessment_library_files,
     }
     return render(request, 'assessment/take_assessment.html', context)
 
@@ -693,6 +698,29 @@ def toggle_assessment_library_file_status(request, file_id):
     status_label = 'activated' if library_file.is_active else 'archived'
     messages.success(request, f'"{library_file.title}" {status_label}.')
     return redirect('/counselor/assessment-tests/')
+
+
+@login_required(login_url='login')
+def download_assessment_library_file(request, file_id):
+    """Download an active library file for the student's selected category."""
+    library_file = get_object_or_404(
+        AssessmentLibraryFile,
+        pk=file_id,
+        is_active=True,
+    )
+    has_matching_assessment = StudentAssessment.objects.filter(
+        student=request.user,
+        status='in_progress',
+        career_category=library_file.course_category,
+    ).exists()
+    if not has_matching_assessment:
+        raise Http404('This assessment material is not available for your assessment.')
+
+    return FileResponse(
+        library_file.file.open('rb'),
+        as_attachment=True,
+        filename=library_file.filename,
+    )
 
 
 # ===== HELPER FUNCTIONS =====

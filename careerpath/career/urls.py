@@ -14,6 +14,7 @@ urlpatterns = [
     
     # Assessment
     path('assessment/start/', views.start_assessment, name='start_assessment'),
+    path('assessment/library/<int:file_id>/download/', views.download_assessment_library_file, name='download_assessment_library_file'),
     path('assessment/results/', views.assessment_results, name='assessment_results'),
     path('assessment/results/<int:assessment_id>/', views.assessment_results, name='assessment_result_detail'),
     

@@ -7,6 +7,7 @@ from unittest.mock import ANY, patch
 from PIL import Image
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from .models import (
     AcademicForecast,
@@ -14,6 +15,7 @@ from .models import (
     AssessmentResponse,
     CareerPath,
     CareerRecommendation,
+    AssessmentLibraryFile,
     StudentAssessment,
     StudentSkillProfile,
     StudentUser,
@@ -106,6 +108,47 @@ class AssessmentLibraryTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Not available at the moment.')
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_active_file_is_available_during_matching_assessment(self):
+        student = StudentUser.objects.create_user(
+            username='student-library',
+            student_id='student-library',
+            email='student-library@example.com',
+            password='TestPass123!',
+        )
+        question = AssessmentQuestion(
+            question_text='Which tool do you prefer?',
+            question_type='skill',
+            category='Technical Skills',
+            career_categories='["it"]',
+            order=1,
+        )
+        question.set_options(['Option A', 'Option B'])
+        question.save()
+        assessment = StudentAssessment.objects.create(
+            student=student,
+            career_category='it',
+            status='in_progress',
+        )
+        library_file = AssessmentLibraryFile.objects.create(
+            title='IT Study Guide',
+            course_category='it',
+            description='Review this before answering.',
+            file=SimpleUploadedFile('study-guide.txt', b'study guide'),
+            is_active=True,
+            uploaded_by=self.staff,
+        )
+        self.addCleanup(lambda: library_file.file.delete(save=False))
+        self.client.force_login(student)
+
+        response = self.client.get(reverse('start_assessment'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'IT Study Guide')
+        download = self.client.get(reverse('download_assessment_library_file', args=[library_file.id]))
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(b''.join(download.streaming_content), b'study guide')
 
 class PublicAssessmentResultsTests(TestCase):
     def setUp(self):

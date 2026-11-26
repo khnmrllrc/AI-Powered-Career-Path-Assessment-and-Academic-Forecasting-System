@@ -23,6 +23,22 @@
                 </div>
             </div>
 
+            {% if assessment_library_files %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-info text-white">
+                    <strong><i class="fas fa-folder-open me-1"></i> Assessment Materials</strong>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for library_file in assessment_library_files %}
+                    <a class="list-group-item list-group-item-action" href="{% url 'download_assessment_library_file' library_file.id %}">
+                        <div class="fw-semibold">{{ library_file.title }}</div>
+                        {% if library_file.description %}<small class="text-muted">{{ library_file.description }}</small>{% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
         </div>
 
         <div class="col-md-9">
