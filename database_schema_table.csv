@@ -1,0 +1,111 @@
+table_name,column_name,data_type,nullable,default_value,constraints,description
+student_user,id,BIGINT,NO,,PRIMARY KEY,Student user identifier
+student_user,password,VARCHAR(128),NO,,,"Hashed password"
+student_user,last_login,TIMESTAMPTZ,YES,,,Last login timestamp
+student_user,is_superuser,BOOLEAN,NO,FALSE,,Administrator permission flag
+student_user,username,VARCHAR(150),NO,,UNIQUE,Login username
+student_user,first_name,VARCHAR(30),NO,'',,Student first name
+student_user,last_name,VARCHAR(150),NO,'',,Student last name
+student_user,email,VARCHAR(254),NO,,UNIQUE,Student email address
+student_user,is_staff,BOOLEAN,NO,FALSE,,Staff permission flag
+student_user,is_active,BOOLEAN,NO,TRUE,,Account active flag
+student_user,date_joined,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Account creation timestamp
+student_user,student_id,VARCHAR(20),NO,,UNIQUE,Institution student ID
+student_user,middle_name,VARCHAR(50),NO,'',,Student middle name
+student_user,suffix,VARCHAR(10),NO,'',,Name suffix
+student_user,qr_code,UUID,YES,,UNIQUE,QR profile identifier
+career_path,id,BIGINT,NO,,PRIMARY KEY,Career path identifier
+career_path,name,VARCHAR(100),NO,,UNIQUE,Career path name
+career_path,category,VARCHAR(50),NO,,,Course category
+career_path,description,TEXT,NO,,,Career path description
+career_path,required_skills,TEXT,NO,'[]',,JSON list of required skills
+career_path,courses,TEXT,NO,'[]',,JSON list of recommended courses
+career_path,success_rate,DOUBLE PRECISION,NO,0,CHECK 0-100,Expected success rate
+assessment_question,id,BIGINT,NO,,PRIMARY KEY,Question identifier
+assessment_question,question_text,TEXT,NO,,,Assessment question text
+assessment_question,question_type,VARCHAR(20),NO,,,"Skill, personality, or aptitude"
+assessment_question,category,VARCHAR(50),NO,,,Question category
+assessment_question,career_categories,TEXT,NO,'[]',,JSON list of supported career categories
+assessment_question,options,TEXT,NO,,,JSON list of answer options
+assessment_question,order,INTEGER,NO,,,Question display order
+assessment_question,is_active,BOOLEAN,NO,TRUE,,Question availability flag
+assessment_library_file,id,BIGINT,NO,,PRIMARY KEY,Library file identifier
+assessment_library_file,title,VARCHAR(150),NO,,,File title
+assessment_library_file,course_category,VARCHAR(50),NO,,,Course category
+assessment_library_file,description,TEXT,NO,'',,File description
+assessment_library_file,file,VARCHAR(100),NO,,,Uploaded file path
+assessment_library_file,is_active,BOOLEAN,NO,TRUE,,File availability flag
+assessment_library_file,uploaded_by_id,BIGINT,YES,,FK student_user.id ON DELETE SET NULL,Uploading staff user
+assessment_library_file,created_at,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Creation timestamp
+assessment_library_file,updated_at,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Last update timestamp
+student_assessment,id,BIGINT,NO,,PRIMARY KEY,Assessment attempt identifier
+student_assessment,student_id,BIGINT,NO,,FK student_user.id ON DELETE CASCADE,Assessment owner
+student_assessment,career_category,VARCHAR(50),NO,'',,Selected career category
+student_assessment,started_at,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Assessment start timestamp
+student_assessment,completed_at,TIMESTAMPTZ,YES,,,Assessment completion timestamp
+student_assessment,status,VARCHAR(20),NO,in_progress,,"in_progress, completed, or abandoned"
+student_assessment,total_score,DOUBLE PRECISION,YES,,,Assessment total score
+assessment_response,id,BIGINT,NO,,PRIMARY KEY,Response identifier
+assessment_response,assessment_id,BIGINT,NO,,FK student_assessment.id ON DELETE CASCADE,Assessment attempt
+assessment_response,question_id,BIGINT,NO,,FK assessment_question.id ON DELETE CASCADE,Answered question
+assessment_response,selected_option,INTEGER,NO,,,Selected option index
+assessment_response,points_earned,TEXT,NO,'{}',,JSON score details
+career_recommendation,id,BIGINT,NO,,PRIMARY KEY,Recommendation identifier
+career_recommendation,student_id,BIGINT,NO,,UNIQUE FK student_user.id ON DELETE CASCADE,Student receiving recommendation
+career_recommendation,recommendation_text,TEXT,NO,,,Generated recommendation text
+career_recommendation,compatibility_score,DOUBLE PRECISION,NO,,CHECK 0-100,Recommendation compatibility score
+career_recommendation,generated_at,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Recommendation generation timestamp
+career_recommendation_career_paths,id,BIGINT,NO,,PRIMARY KEY,Recommendation relationship identifier
+career_recommendation_career_paths,careerrecommendation_id,BIGINT,NO,,FK career_recommendation.id ON DELETE CASCADE,Recommendation reference
+career_recommendation_career_paths,careerpath_id,BIGINT,NO,,FK career_path.id ON DELETE CASCADE,Career path reference
+academic_forecast,id,BIGINT,NO,,PRIMARY KEY,Forecast identifier
+academic_forecast,student_id,BIGINT,NO,,UNIQUE FK student_user.id ON DELETE CASCADE,Student receiving forecast
+academic_forecast,selected_career_path_id,BIGINT,YES,,FK career_path.id ON DELETE SET NULL,Selected career path
+academic_forecast,predicted_success_rate,DOUBLE PRECISION,NO,,CHECK 0-100,Predicted academic success rate
+academic_forecast,improvement_areas,TEXT,NO,'[]',,JSON list of improvement areas
+academic_forecast,recommended_subjects,TEXT,NO,'[]',,JSON list of recommended subjects
+academic_forecast,forecast_date,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Forecast timestamp
+in_demand_career,id,BIGINT,NO,,PRIMARY KEY,Career identifier
+in_demand_career,rank,INTEGER,NO,,UNIQUE,Ranking position
+in_demand_career,title,VARCHAR(100),NO,,,Career title
+in_demand_career,description,TEXT,NO,,,Career description
+in_demand_career,required_skills,TEXT,NO,'[]',,JSON list of required skills
+in_demand_career,average_salary,VARCHAR(100),NO,,,Average salary range
+in_demand_career,job_growth,VARCHAR(50),NO,,,Job growth description
+in_demand_career_related_careers,id,BIGINT,NO,,PRIMARY KEY,Relationship identifier
+in_demand_career_related_careers,indemandcareer_id,BIGINT,NO,,FK in_demand_career.id ON DELETE CASCADE,In-demand career reference
+in_demand_career_related_careers,careerpath_id,BIGINT,NO,,FK career_path.id ON DELETE CASCADE,Career path reference
+student_skill_profile,id,BIGINT,NO,,PRIMARY KEY,Skill profile identifier
+student_skill_profile,student_id,BIGINT,NO,,UNIQUE FK student_user.id ON DELETE CASCADE,Profile owner
+student_skill_profile,skills,TEXT,NO,'{}',,JSON skill-to-score mapping
+student_skill_profile,strengths,TEXT,NO,'[]',,JSON list of strengths
+student_skill_profile,weaknesses,TEXT,NO,'[]',,JSON list of weaknesses
+student_skill_profile,last_updated,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Profile update timestamp
+student_report,id,BIGINT,NO,,PRIMARY KEY,Report identifier
+student_report,student_id,BIGINT,NO,,UNIQUE FK student_user.id ON DELETE CASCADE,Report owner
+student_report,assessment_score,DOUBLE PRECISION,YES,,,Assessment score in report
+student_report,counselor_notes,TEXT,NO,'',,Counselor notes
+student_report,is_flagged,BOOLEAN,NO,FALSE,,Follow-up flag
+student_report,created_at,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Creation timestamp
+student_report,updated_at,TIMESTAMPTZ,NO,CURRENT_TIMESTAMP,,Last update timestamp
+student_report_recommended_paths,id,BIGINT,NO,,PRIMARY KEY,Report relationship identifier
+student_report_recommended_paths,studentreport_id,BIGINT,NO,,FK student_report.id ON DELETE CASCADE,Report reference
+student_report_recommended_paths,careerpath_id,BIGINT,NO,,FK career_path.id ON DELETE CASCADE,Career path reference
+django_content_type,id,BIGINT,NO,,PRIMARY KEY,Content type identifier
+django_content_type,app_label,VARCHAR(100),NO,,,Application label
+django_content_type,model,VARCHAR(100),NO,,,Model name
+auth_permission,id,BIGINT,NO,,PRIMARY KEY,Permission identifier
+auth_permission,name,VARCHAR(255),NO,,,Permission name
+auth_permission,content_type_id,BIGINT,NO,,FK django_content_type.id ON DELETE CASCADE,Permission content type
+auth_permission,codename,VARCHAR(100),NO,,,Permission code
+auth_group,id,BIGINT,NO,,PRIMARY KEY,Group identifier
+auth_group,name,VARCHAR(150),NO,,UNIQUE,Group name
+auth_group_permissions,id,BIGINT,NO,,PRIMARY KEY,Group permission relationship identifier
+auth_group_permissions,group_id,BIGINT,NO,,FK auth_group.id ON DELETE CASCADE,Group reference
+auth_group_permissions,permission_id,BIGINT,NO,,FK auth_permission.id ON DELETE CASCADE,Permission reference
+student_user_groups,id,BIGINT,NO,,PRIMARY KEY,Student group relationship identifier
+student_user_groups,studentuser_id,BIGINT,NO,,FK student_user.id ON DELETE CASCADE,Student user reference
+student_user_groups,group_id,BIGINT,NO,,FK auth_group.id ON DELETE CASCADE,Group reference
+student_user_user_permissions,id,BIGINT,NO,,PRIMARY KEY,Student permission relationship identifier
+student_user_user_permissions,studentuser_id,BIGINT,NO,,FK student_user.id ON DELETE CASCADE,Student user reference
+student_user_user_permissions,permission_id,BIGINT,NO,,FK auth_permission.id ON DELETE CASCADE,Permission reference

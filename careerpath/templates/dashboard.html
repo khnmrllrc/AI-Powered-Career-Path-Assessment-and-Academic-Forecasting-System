@@ -16,28 +16,24 @@
         <div class="col-md-12">
             <h4 class="mb-3">Quick Actions</h4>
         </div>
-        {% if not assessment or assessment.status != 'completed' %}
         <div class="col-md-3 mb-3">
             <a href="{% url 'start_assessment' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
                 <div class="card-body text-center">
                     <i class="fas fa-edit fa-2x text-primary mb-3"></i>
                     <h5 class="card-title">Take Assessment</h5>
-                    <p class="card-text"><small>Start or resume your career assessment</small></p>
+                    <p class="card-text"><small>Take a new assessment or resume one in progress</small></p>
                 </div>
             </a>
         </div>
-        {% else %}
+        {% if assessment_history %}
         <div class="col-md-3 mb-3">
             <a href="{% url 'assessment_results' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
-                <div class="card-body text-center">
-                    <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
-                    <h5 class="card-title">Assessment Results</h5>
-                    <p class="card-text"><small>View your assessment results</small></p>
-                </div>
+                <div class="card-body text-center"><i class="fas fa-history fa-2x text-success mb-3"></i><h5 class="card-title">Assessment History</h5><p class="card-text"><small>Review previous results</small></p></div>
             </a>
         </div>
         {% endif %}
 
+        {% if assessment_complete %}
         <div class="col-md-3 mb-3">
             <a href="{% url 'view_career_recommendations' %}" class="card text-decoration-none border-0 shadow-sm h-100" style="color: inherit;">
                 <div class="card-body text-center">
@@ -67,6 +63,7 @@
                 </div>
             </a>
         </div>
+        {% endif %}
 
         {% if not user.is_staff %}
         <div class="col-md-3 mb-3">
@@ -93,7 +90,7 @@
                     {% if assessment %}
                         <p class="mb-2">
                             <strong>Status:</strong> 
-                            <span class="badge {% if assessment.status == 'completed' %}bg-success{% else %}bg-warning{% endif %}">
+                            <span class="badge {% if assessment.status == 'completed' %}bg-success{% elif assessment.status == 'abandoned' %}bg-danger{% else %}bg-warning{% endif %}">
                                 {{ assessment.get_status_display }}
                             </span>
                         </p>

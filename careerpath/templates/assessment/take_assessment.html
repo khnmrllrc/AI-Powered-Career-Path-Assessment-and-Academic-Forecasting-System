@@ -11,6 +11,7 @@
                     <strong>Progress</strong>
                 </div>
                 <div class="card-body">
+                    <p class="mb-3"><strong>Career category:</strong> {{ career_category }}</p>
                     <div class="progress mb-3" style="height: 25px;">
                         <div class="progress-bar" style="width: {{ current_question|add:0 }}%">
                             {{ current_question }}/{{ total_questions }}
@@ -22,33 +23,6 @@
                 </div>
             </div>
 
-            {% if library_files_by_category %}
-            <div class="card border-0 shadow-sm mt-4">
-                <div class="card-header bg-dark text-white">
-                    <strong>Assessment Library</strong>
-                </div>
-                <div class="card-body">
-                    {% for category, files in library_files_by_category.items %}
-                        <div class="mb-3">
-                            <h6 class="mb-2">{{ category }}</h6>
-                            {% for library_file in files %}
-                                <div class="border rounded p-2 mb-2 bg-light">
-                                    <strong class="d-block small">{{ library_file.title }}</strong>
-                                    {% if library_file.description %}
-                                        <span class="d-block text-muted small mb-2">{{ library_file.description }}</span>
-                                    {% endif %}
-                                    {% if library_file.file %}
-                                        <a href="{{ library_file.file.url }}" class="btn btn-outline-primary btn-sm w-100" target="_blank" rel="noopener">
-                                            <i class="fas fa-file-arrow-down me-1"></i>Open File
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
         </div>
 
         <div class="col-md-9">
@@ -97,6 +71,10 @@
                                 {% else %}
                                     Next Question <i class="fas fa-arrow-right"></i>
                                 {% endif %}
+                            </button>
+                            <button type="submit" name="action" value="abandon" class="btn btn-outline-danger ms-2" formnovalidate
+                                    onclick="return confirm('Leave this assessment unfinished? Your saved answers will be kept.');">
+                                Leave Assessment
                             </button>
                         </div>
                     </form>

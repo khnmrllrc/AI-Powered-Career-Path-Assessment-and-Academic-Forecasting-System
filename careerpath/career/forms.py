@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from .models import StudentUser, AssessmentResponse, CareerPath, AssessmentQuestion, AssessmentLibraryFile
+from .models import StudentUser, AssessmentResponse, CareerPath, AssessmentQuestion, AssessmentLibraryFile, COURSE_CATEGORY_CHOICES
 import json
 
 User = get_user_model()
@@ -183,6 +183,20 @@ class AssessmentQuestionForm(forms.Form):
             label=question.question_text,
             required=True
         )
+
+
+class AssessmentCategoryForm(forms.Form):
+    career_category = forms.ChoiceField(
+        label='Choose a career category',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, available_categories, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['career_category'].choices = [
+            (value, label) for value, label in COURSE_CATEGORY_CHOICES
+            if value in available_categories
+        ]
 
 
 class CareerPathSelectionForm(forms.Form):

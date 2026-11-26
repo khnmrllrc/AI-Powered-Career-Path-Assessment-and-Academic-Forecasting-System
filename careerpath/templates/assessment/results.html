@@ -7,11 +7,13 @@
     <div class="row">
         <div class="col-md-8 mx-auto">
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-success text-white">
-                    <i class="fas fa-check-circle"></i> Assessment Complete!
+                <div class="card-header {% if assessment.status == 'completed' %}bg-success{% else %}bg-danger{% endif %} text-white">
+                    <i class="fas {% if assessment.status == 'completed' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+                    {% if assessment.status == 'completed' %}Assessment Complete!{% else %}Assessment Abandoned{% endif %}
                 </div>
                 <div class="card-body p-4">
                     <h5 class="card-title mb-4">Your Assessment Results</h5>
+                    <p class="text-muted">Career category: <strong>{{ assessment.get_career_category_display|default:"General" }}</strong></p>
                     
                     {% if assessment %}
                     <div class="row text-center mb-4">
@@ -30,10 +32,16 @@
                         <div class="col-md-4">
                             <div class="card border-0 bg-light p-3">
                                 <h6 class="text-muted">Status</h6>
-                                <h3><span class="badge bg-success">Completed</span></h3>
+                                <h3><span class="badge {% if assessment.status == 'completed' %}bg-success{% else %}bg-danger{% endif %}">{{ assessment.get_status_display }}</span></h3>
                             </div>
                         </div>
                     </div>
+
+                    {% if assessment.status == 'abandoned' %}
+                    <div class="alert alert-warning">
+                        This assessment was left unfinished. Your saved answers are kept in this attempt, but results and recommendations are only available after completing a new assessment.
+                    </div>
+                    {% endif %}
 
                     {% if skill_profile and skill_profile.skills %}
                     <h6 class="mt-4 mb-3">Your Top Skills</h6>
@@ -64,15 +72,25 @@
                     {% endif %}
 
                     <div class="mt-4 d-flex gap-2">
-                        <a href="{% url 'view_career_recommendations' %}" class="btn btn-primary">
+                        <a href="{% url 'start_assessment' %}" class="btn btn-success"><i class="fas fa-redo"></i> Take Assessment Again</a>
+                        {% if assessment.status == 'completed' and recommendation %}<a href="{% url 'view_career_recommendations' %}" class="btn btn-primary">
                             <i class="fas fa-path"></i> View Career Recommendations
-                        </a>
-                        <a href="{% url 'academic_forecast' %}" class="btn btn-info">
+                        </a>{% endif %}
+                        {% if assessment.status == 'completed' %}<a href="{% url 'academic_forecast' %}" class="btn btn-info">
                             <i class="fas fa-chart-line"></i> Academic Forecast
-                        </a>
+                        </a>{% endif %}
                         <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
                             Back to Dashboard
                         </a>
+                    </div>
+
+                    <h6 class="mt-5">Your Assessment History</h6>
+                    <div class="list-group">
+                        {% for attempt in assessment_history %}
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{% url 'assessment_result_detail' attempt.id %}">
+                            <span>Attempt {{ forloop.revcounter }} · {{ attempt.get_career_category_display|default:"General" }} · {{ attempt.completed_at|date:"M j, Y g:i A" }}</span><strong>{{ attempt.total_score|floatformat:0 }}</strong>
+                        </a>
+                        {% empty %}<div class="text-muted">No assessment attempts yet.</div>{% endfor %}
                     </div>
                     {% else %}
                     <div class="alert alert-warning">

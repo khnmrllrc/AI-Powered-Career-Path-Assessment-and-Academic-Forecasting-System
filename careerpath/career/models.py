@@ -24,6 +24,22 @@ COURSE_CATEGORY_CHOICES = [
     ('science', 'Science'),
 ]
 
+QUESTION_CAREER_CATEGORY_MAP = {
+    'Technical Skills': ['it', 'engineering', 'aviation'],
+    'Academic Skills': ['engineering', 'aviation', 'biology', 'nursing', 'physical_therapy', 'adtech', 'science'],
+    'Communication': ['education', 'hospitality', 'entrepreneurship', 'aviation', 'psychology', 'nursing', 'criminology', 'physical_therapy', 'business'],
+    'Analytical Skills': ['it', 'engineering', 'entrepreneurship', 'psychology', 'biology', 'criminology', 'adtech', 'business', 'science'],
+    'Work Style': ['it', 'education', 'entrepreneurship', 'psychology', 'biology', 'adtech', 'business', 'science'],
+    'Interpersonal': ['education', 'hospitality', 'psychology', 'nursing', 'physical_therapy'],
+    'Stress Management': ['hospitality', 'aviation', 'nursing', 'criminology', 'physical_therapy'],
+    'Risk Attitude': ['entrepreneurship', 'business', 'adtech'],
+    'Work Environment': ['education', 'hospitality', 'nursing', 'criminology', 'business'],
+    'Mathematics': ['engineering', 'aviation', 'biology', 'adtech', 'science'],
+    'Logical Reasoning': ['it', 'engineering', 'aviation', 'criminology', 'science'],
+    'Language': ['education', 'psychology', 'biology', 'business'],
+    'Verbal Reasoning': ['education', 'psychology', 'criminology', 'business'],
+}
+
 class StudentUser(AbstractUser):
     student_id = models.CharField(max_length=20, unique=True)
     first_name = models.CharField('first name', max_length=30, blank=True)
@@ -117,6 +133,7 @@ class AssessmentQuestion(models.Model):
     question_text = models.TextField()
     question_type = models.CharField(max_length=20, choices=QUESTION_TYPES)
     category = models.CharField(max_length=50)  # Science, IT, Engineering, etc.
+    career_categories = models.TextField(default='[]', help_text='JSON list of career categories this question supports')
     options = models.TextField(help_text="JSON list of options")
     order = models.IntegerField()
     is_active = models.BooleanField(default=True)
@@ -153,6 +170,16 @@ class AssessmentQuestion(models.Model):
     
     def set_options(self, options):
         self.options = json.dumps(options)
+
+    def get_career_categories(self):
+        try:
+            categories = json.loads(self.career_categories)
+            return categories if isinstance(categories, list) else []
+        except (TypeError, ValueError):
+            return []
+
+    def set_career_categories(self, categories):
+        self.career_categories = json.dumps(categories)
 
 
 class AssessmentLibraryFile(models.Model):
@@ -191,7 +218,8 @@ class StudentAssessment(models.Model):
         ('abandoned', 'Abandoned'),
     ]
     
-    student = models.OneToOneField(StudentUser, on_delete=models.CASCADE, related_name='assessment')
+    student = models.ForeignKey(StudentUser, on_delete=models.CASCADE, related_name='assessments')
+    career_category = models.CharField(max_length=50, choices=COURSE_CATEGORY_CHOICES, blank=True, default='')
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in_progress')

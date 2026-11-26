@@ -22,6 +22,7 @@ from .forms import (
     LoginForm,
     RegisterForm,
     AssessmentQuestionForm,
+    AssessmentCategoryForm,
     AssessmentLibraryFileForm,
     CareerPathSelectionForm,
     CounselorNotesForm,
@@ -29,7 +30,7 @@ from .forms import (
 from .models import (
     StudentUser, StudentAssessment, AssessmentResponse, AssessmentQuestion,
     CareerRecommendation, AcademicForecast, InDemandCareer, StudentSkillProfile,
-    StudentReport, CareerPath, AssessmentLibraryFile
+    StudentReport, CareerPath, AssessmentLibraryFile, COURSE_CATEGORY_CHOICES
 )
 
 LOGO_PATH = Path(__file__).resolve().parent / 'static' / 'career' / 'aclc-logo.png'
@@ -171,22 +172,28 @@ def dashboard(request):
         return redirect('counselor_dashboard')
     
     # Get assessment status
-    assessment = StudentAssessment.objects.filter(student=student).first()
+    assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
+    assessment_history = StudentAssessment.objects.filter(
+        student=student,
+        status__in=['completed', 'abandoned'],
+    ).order_by('-started_at', '-pk')
+    assessment_complete = bool(assessment and assessment.status == 'completed')
     
     # Get recommendations
-    recommendation = CareerRecommendation.objects.filter(student=student).first()
+    recommendation = CareerRecommendation.objects.filter(student=student).first() if assessment_complete else None
     
     # Get forecast
-    forecast = AcademicForecast.objects.filter(student=student).first()
+    forecast = AcademicForecast.objects.filter(student=student).first() if assessment_complete else None
     
     # Get top in-demand careers
     top_careers = InDemandCareer.objects.all()[:5]
     
     # Get skill profile
-    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first() if assessment_complete else None
     
     context = {
         'assessment': assessment,
+        'assessment_history': assessment_history,
         'recommendation': recommendation,
         'forecast': forecast,
         'top_careers': top_careers,
@@ -202,22 +209,34 @@ def start_assessment(request):
     student = request.user
     
     # Get or create assessment
-    assessment, created = StudentAssessment.objects.get_or_create(student=student)
-    
-    if assessment.status == 'completed':
-        messages.info(request, 'You have already completed the assessment.')
-        return redirect('assessment_results')
+    assessment = StudentAssessment.objects.filter(student=student, status='in_progress').order_by('-started_at').first()
+    if assessment is None or not assessment.career_category:
+        available_categories = get_available_assessment_categories()
+        category_form = AssessmentCategoryForm(available_categories, request.POST or None)
+        if request.method == 'POST' and category_form.is_valid():
+            if assessment is None:
+                assessment = StudentAssessment(student=student)
+            assessment.career_category = category_form.cleaned_data['career_category']
+            assessment.save()
+            return redirect('start_assessment')
+        return render(request, 'assessment/select_category.html', {
+            'form': category_form,
+            'available_categories': available_categories,
+        })
     
     # Get first unanswered question
     answered_questions = AssessmentResponse.objects.filter(
         assessment=assessment
     ).values_list('question_id', flat=True)
     
-    next_question = AssessmentQuestion.objects.filter(
-        is_active=True
-    ).exclude(
+    next_question = AssessmentQuestion.objects.filter(is_active=True).exclude(
         id__in=answered_questions
-    ).first()
+    )
+    next_question = next(
+        (question for question in next_question.order_by('?')
+         if assessment.career_category in question.get_career_categories()),
+        None,
+    )
     
     if not next_question:
         # All questions answered - complete assessment
@@ -233,6 +252,12 @@ def start_assessment(request):
         return redirect('assessment_results')
     
     if request.method == 'POST':
+        if request.POST.get('action') == 'abandon':
+            assessment.status = 'abandoned'
+            assessment.save(update_fields=['status'])
+            messages.info(request, 'Assessment left unfinished. Your saved answers are kept in this attempt.')
+            return redirect('dashboard')
+
         form = AssessmentQuestionForm(next_question, request.POST)
         if form.is_valid():
             selected_option = int(form.cleaned_data['answer'])
@@ -241,6 +266,8 @@ def start_assessment(request):
 
             if 0 <= selected_option < len(options):
                 selected_points = options[selected_option].get('points', {})
+            if not selected_points:
+                selected_points = score_assessment_answer(next_question, selected_option)
             
             # Save response
             AssessmentResponse.objects.update_or_create(
@@ -257,43 +284,63 @@ def start_assessment(request):
     else:
         form = AssessmentQuestionForm(next_question)
     
-    total_questions = AssessmentQuestion.objects.filter(is_active=True).count()
+    total_questions = len(get_assessment_questions_for_category(assessment.career_category))
     answered_count = answered_questions.count()
 
-    library_files_by_category = {}
-    for library_file in AssessmentLibraryFile.objects.filter(is_active=True).select_related('uploaded_by'):
-        library_files_by_category.setdefault(
-            library_file.get_course_category_display(),
-            []
-        ).append(library_file)
-    
     context = {
         'form': form,
         'question': next_question,
         'current_question': answered_count + 1,
         'total_questions': total_questions,
-        'library_files_by_category': library_files_by_category,
+        'career_category': assessment.get_career_category_display(),
     }
     return render(request, 'assessment/take_assessment.html', context)
 
 
+def get_assessment_questions_for_category(career_category):
+    return [
+        question for question in AssessmentQuestion.objects.filter(is_active=True)
+        if career_category in question.get_career_categories()
+    ]
+
+
+def get_available_assessment_categories():
+    question_categories = {
+        category
+        for question in AssessmentQuestion.objects.filter(is_active=True)
+        for category in question.get_career_categories()
+    }
+    available_path_categories = set(CareerPath.objects.values_list('category', flat=True))
+    return question_categories & available_path_categories
+
+
 @login_required(login_url='login')
-def assessment_results(request):
+def assessment_results(request, assessment_id=None):
     """Display assessment results"""
     student = request.user
-    assessment = StudentAssessment.objects.filter(student=student).first()
+    attempts = StudentAssessment.objects.filter(
+        student=student,
+        status__in=['completed', 'abandoned'],
+    ).order_by('-started_at', '-pk')
+    completed_attempts = attempts.filter(status='completed')
+    assessment = get_object_or_404(attempts, pk=assessment_id) if assessment_id else (
+        completed_attempts.first() or attempts.first()
+    )
+    latest_assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
     
-    if not assessment or assessment.status != 'completed':
-        messages.warning(request, 'Please complete the assessment first.')
+    if not assessment:
+        messages.warning(request, 'Please start an assessment first.')
         return redirect('start_assessment')
     
-    recommendation = CareerRecommendation.objects.filter(student=student).first()
-    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    is_latest_completed = assessment == latest_assessment
+    recommendation = CareerRecommendation.objects.filter(student=student).first() if is_latest_completed else None
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first() if is_latest_completed else None
     
     context = {
         'assessment': assessment,
         'recommendation': recommendation,
         'skill_profile': skill_profile,
+        'assessment_history': attempts,
     }
     return render(request, 'assessment/results.html', context)
 
@@ -302,6 +349,11 @@ def assessment_results(request):
 def view_career_recommendations(request):
     """View career recommendations"""
     student = request.user
+    latest_assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
+    if not latest_assessment or latest_assessment.status != 'completed':
+        messages.warning(request, 'Complete an assessment before viewing career recommendations.')
+        return redirect('start_assessment')
+
     recommendation = CareerRecommendation.objects.filter(student=student).first()
     
     if not recommendation:
@@ -327,6 +379,10 @@ def view_career_recommendations(request):
 def academic_forecast(request):
     """Generate or view academic forecast"""
     student = request.user
+    latest_assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
+    if not latest_assessment or latest_assessment.status != 'completed':
+        messages.warning(request, 'Complete an assessment before generating an academic forecast.')
+        return redirect('start_assessment')
     
     if request.method == 'POST':
         form = CareerPathSelectionForm(request.POST)
@@ -361,6 +417,11 @@ def academic_forecast(request):
 def view_academic_forecast(request):
     """View academic forecast results"""
     student = request.user
+    latest_assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
+    if not latest_assessment or latest_assessment.status != 'completed':
+        messages.warning(request, 'Complete an assessment before viewing an academic forecast.')
+        return redirect('start_assessment')
+
     forecast = AcademicForecast.objects.filter(student=student).first()
     
     if not forecast:
@@ -386,9 +447,10 @@ def qr_profile(request):
         student.save(update_fields=['qr_code'])
     
     # Get all student data
-    assessment = StudentAssessment.objects.filter(student=student).first()
-    recommendation = CareerRecommendation.objects.filter(student=student).first()
-    forecast = AcademicForecast.objects.filter(student=student).first()
+    assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
+    has_completed_latest = bool(assessment and assessment.status == 'completed')
+    recommendation = CareerRecommendation.objects.filter(student=student).first() if has_completed_latest else None
+    forecast = AcademicForecast.objects.filter(student=student).first() if has_completed_latest else None
     qr_results_url = get_qr_results_url(request, student)
     
     context = {
@@ -404,10 +466,12 @@ def qr_profile(request):
 def public_assessment_results(request, qr_code):
     """Public QR destination for a student's completed assessment results."""
     student = get_object_or_404(StudentUser, qr_code=qr_code)
-    assessment = StudentAssessment.objects.filter(student=student).first()
-    recommendation = CareerRecommendation.objects.filter(student=student).first()
-    forecast = AcademicForecast.objects.filter(student=student).first()
-    skill_profile = StudentSkillProfile.objects.filter(student=student).first()
+    assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
+    if assessment and assessment.status != 'completed':
+        assessment = None
+    recommendation = CareerRecommendation.objects.filter(student=student).first() if assessment else None
+    forecast = AcademicForecast.objects.filter(student=student).first() if assessment else None
+    skill_profile = StudentSkillProfile.objects.filter(student=student).first() if assessment else None
 
     response_details = []
     if assessment:
@@ -458,6 +522,11 @@ def view_in_demand_careers(request):
 def job_market_matching(request):
     """Match student skills with in-demand careers"""
     student = request.user
+    latest_assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
+    if not latest_assessment or latest_assessment.status != 'completed':
+        messages.warning(request, 'Complete an assessment before viewing personalized job matches.')
+        return redirect('start_assessment')
+
     skill_profile = StudentSkillProfile.objects.filter(student=student).first()
     
     if not skill_profile or not skill_profile.get_skills():
@@ -473,6 +542,7 @@ def job_market_matching(request):
         matched_careers.append({
             'career': career,
             'match_score': match_score,
+            'required_skills': career.get_required_skills(),
         })
     
     # Sort by match score
@@ -518,7 +588,7 @@ def student_report(request, student_id):
     
     student = get_object_or_404(StudentUser, id=student_id)
     report = StudentReport.objects.get(student=student)
-    assessment = StudentAssessment.objects.filter(student=student).first()
+    assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
     recommendation = CareerRecommendation.objects.filter(student=student).first()
     forecast = AcademicForecast.objects.filter(student=student).first()
     
@@ -561,10 +631,10 @@ def students_list(request):
     status = request.GET.get('status')
     if status:
         if status == 'completed':
-            students = students.filter(assessment__status='completed')
+            students = students.filter(assessments__status='completed').distinct()
         elif status == 'pending':
             students = students.filter(
-                Q(assessment__status='in_progress') | Q(assessment__isnull=True)
+                Q(assessments__status='in_progress') | Q(assessments__isnull=True)
             )
     
     context = {'students': students}
@@ -594,7 +664,7 @@ def assessment_tests_admin(request):
         messages.error(request, 'Adding assessment tests is disabled on this page.')
         return redirect('/counselor/assessment-tests/')
 
-    files_by_category = {}
+    files_by_category = {label: [] for _, label in COURSE_CATEGORY_CHOICES}
     for library_file in AssessmentLibraryFile.objects.select_related('uploaded_by'):
         files_by_category.setdefault(library_file.get_course_category_display(), []).append(library_file)
 
@@ -603,7 +673,7 @@ def assessment_tests_admin(request):
         'files_by_category': files_by_category,
         'file_count': AssessmentLibraryFile.objects.count(),
         'active_file_count': AssessmentLibraryFile.objects.filter(is_active=True).count(),
-        'library_category_count': len(files_by_category),
+        'library_category_count': sum(bool(files) for files in files_by_category.values()),
     }
     return render(request, 'admin/assessment_tests.html', context)
 
@@ -653,29 +723,30 @@ def generate_career_recommendations(student, assessment):
                 skill_scores[skill] = skill_scores.get(skill, 0) + score
     
     # Find matching career paths
-    career_paths = CareerPath.objects.all()
+    career_paths = CareerPath.objects.filter(category=assessment.career_category)
     recommendations = []
     
     for path in career_paths:
         match_score = 0
         required_skills = path.get_required_skills()
+        matched_skills = []
         
         for skill in required_skills:
             if skill in skill_scores:
                 match_score += skill_scores[skill]
+                matched_skills.append(skill)
         
         if match_score > 0:
-            recommendations.append((path, match_score))
+            recommendations.append((path, match_score, matched_skills))
     
     # Sort and take top 3
-    recommendations.sort(key=lambda x: x[1], reverse=True)
+    recommendations.sort(key=lambda x: (x[1], len(x[2])), reverse=True)
     top_paths = [x[0] for x in recommendations[:3]]
     
     # Calculate compatibility score
     if recommendations:
-        total_possible = len(top_paths) * max([x[1] for x in recommendations])
-        actual_score = sum([x[1] for x in recommendations[:3]])
-        compatibility_score = (actual_score / total_possible * 100) if total_possible > 0 else 0
+        best_match = recommendations[0][1]
+        compatibility_score = min(100, (best_match / max(1, len(recommendations[0][0].get_required_skills()) * 5)) * 100)
     else:
         compatibility_score = 0
     
@@ -690,25 +761,73 @@ def generate_career_recommendations(student, assessment):
     recommendation, _ = CareerRecommendation.objects.update_or_create(
         student=student,
         defaults={
-            'recommendation_text': generate_recommendation_text(top_paths),
+            'recommendation_text': generate_recommendation_text(recommendations[:3], skill_scores),
             'compatibility_score': min(compatibility_score, 100),
         }
     )
     recommendation.career_paths.set(top_paths)
 
 
-def generate_recommendation_text(career_paths):
-    """Generate descriptive recommendation text"""
-    if not career_paths:
-        return "Based on your assessment, we recommend exploring various career paths."
-    
-    path_names = ', '.join([p.name for p in career_paths])
-    return f"Based on your assessment results, we recommend the following career paths: {path_names}. These paths align with your identified skills and interests."
+def score_assessment_answer(question, selected_option):
+    """Translate an answer into career skill evidence for the recommendation engine."""
+    category = question.category.lower()
+    text = question.question_text.lower()
+    skills_by_category = {
+        'technical skills': ['Python', 'JavaScript', 'Programming', 'Problem Solving'],
+        'academic skills': ['Mathematics', 'Statistics', 'Physics', 'Analytical Thinking'],
+        'communication': ['Communication', 'Report Writing', 'Customer Service', 'Teaching'],
+        'analytical skills': ['Analysis', 'Problem Solving', 'Critical Thinking', 'Attention to Detail'],
+        'work style': ['Research', 'Analysis', 'Problem Solving'],
+        'interpersonal': ['Empathy', 'Compassion', 'Customer Service', 'Teaching'],
+        'stress management': ['Decision Making', 'Attention to Detail', 'Problem Solving'],
+        'risk attitude': ['Risk Management', 'Innovation', 'Business Acumen'],
+        'work environment': ['Organization', 'Attention to Detail', 'Compliance'],
+        'mathematics': ['Mathematics', 'Statistics', 'Problem Solving'],
+        'logical reasoning': ['Logical Reasoning', 'Analysis', 'Critical Thinking'],
+        'language': ['Communication', 'Report Writing'],
+        'verbal reasoning': ['Communication', 'Analysis'],
+    }
+    skills = skills_by_category.get(category, [])
+
+    # The aptitude questions have one correct option. Give correct answers full
+    # evidence and incorrect answers a small amount so the result stays useful.
+    correct_answers = {
+        'solve: if 5 apples': 3,
+        'what is the next number': 3,
+        'which word is spelled correctly': 1,
+        'complete the analogy': 2,
+    }
+    correct_index = next((index for prompt, index in correct_answers.items() if text.startswith(prompt)), None)
+    if correct_index is not None:
+        value = 5 if selected_option == correct_index else 1
+    else:
+        # Self-ratings use the selected level (1 to 5) as evidence strength.
+        value = min(5, max(1, selected_option + 1))
+
+    return {skill: value for skill in skills}
+
+
+def generate_recommendation_text(recommendations, skill_scores):
+    """Explain which answer signals support the suggested career paths."""
+    if not recommendations:
+        return (
+            'Your answers did not strongly match the skills listed for a specific career path yet. '
+            'Review your skill profile and explore the available paths to find areas you would like to develop.'
+        )
+
+    strongest_skills = sorted(skill_scores.items(), key=lambda item: item[1], reverse=True)[:3]
+    strength_text = ', '.join(skill for skill, _ in strongest_skills)
+    path_reasons = []
+    for path, _score, matched_skills in recommendations:
+        path_reasons.append(f"{path.name} (matches: {', '.join(matched_skills[:3])})")
+
+    opening = f"Your strongest assessment signals were {strength_text}. " if strength_text else ''
+    return opening + 'Career paths that align with those answers: ' + '; '.join(path_reasons) + '.'
 
 
 def generate_success_prediction(student, career_path):
     """Predict student's success in a career path"""
-    assessment = StudentAssessment.objects.filter(student=student).first()
+    assessment = StudentAssessment.objects.filter(student=student).order_by('-started_at', '-pk').first()
     skill_profile = StudentSkillProfile.objects.filter(student=student).first()
     
     if not assessment or not skill_profile:

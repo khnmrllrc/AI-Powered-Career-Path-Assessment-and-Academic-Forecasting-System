@@ -15,6 +15,7 @@ urlpatterns = [
     # Assessment
     path('assessment/start/', views.start_assessment, name='start_assessment'),
     path('assessment/results/', views.assessment_results, name='assessment_results'),
+    path('assessment/results/<int:assessment_id>/', views.assessment_results, name='assessment_result_detail'),
     
     # Career Recommendations
     path('career/recommendations/', views.view_career_recommendations, name='view_career_recommendations'),

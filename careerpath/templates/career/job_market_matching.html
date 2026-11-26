@@ -13,7 +13,7 @@
         <div class="col-md-6 mb-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header" style="background-color: {% if item.match_score >= 80 %}#28a745{% elif item.match_score >= 60 %}#ffc107{% else %}#dc3545{% endif %}; color: white;">
-                    <h6 class="mb-0">#{item.career.rank} - {{ item.career.title }}</h6>
+                    <h6 class="mb-0">#{{ item.career.rank }} - {{ item.career.title }}</h6>
                 </div>
                 <div class="card-body">
                     <p class="card-text">{{ item.career.description|truncatewords:30 }}</p>
@@ -40,11 +40,11 @@
                         </div>
                     </div>
 
-                    {% if item.career.required_skills %}
+                    {% if item.required_skills %}
                     <div class="mt-3">
                         <h6>Skills Needed</h6>
                         <div>
-                            {% for skill in item.career.required_skills %}
+                            {% for skill in item.required_skills %}
                                 <span class="badge bg-light text-dark me-2 mb-2">{{ skill }}</span>
                             {% endfor %}
                         </div>
@@ -56,9 +56,9 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="alert alert-warning">
-        <p>No matching data available. Please complete the assessment first.</p>
-        <a href="{% url 'start_assessment' %}" class="btn btn-primary">Start Assessment</a>
+    <div class="alert alert-info">
+        <p class="mb-2">No in-demand career data is available to match right now.</p>
+        <a href="{% url 'view_in_demand_careers' %}" class="btn btn-outline-primary">Browse In-Demand Careers</a>
     </div>
     {% endif %}
 

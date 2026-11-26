@@ -5,7 +5,7 @@ Usage: python manage.py populate_initial_data
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from career.models import CareerPath, AssessmentQuestion, InDemandCareer
+from career.models import CareerPath, AssessmentQuestion, InDemandCareer, QUESTION_CAREER_CATEGORY_MAP
 import json
 
 class Command(BaseCommand):
@@ -149,6 +149,7 @@ class Command(BaseCommand):
                 name=data['name'],
                 defaults={
                     'category': data['category'],
+                    'career_categories': json.dumps(QUESTION_CAREER_CATEGORY_MAP.get(data['category'], [])),
                     'description': data['description'],
                     'success_rate': data['success_rate']
                 }

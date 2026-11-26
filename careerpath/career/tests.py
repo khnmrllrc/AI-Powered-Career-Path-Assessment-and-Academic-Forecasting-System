@@ -59,6 +59,54 @@ class LoginViewTests(TestCase):
         self.assertTrue(user.check_password('legacy123'))
 
 
+class AssessmentHistoryTests(TestCase):
+    def setUp(self):
+        self.student = StudentUser.objects.create_user(
+            username='21000111222',
+            student_id='21000111222',
+            email='history@example.com',
+            password='TestPass123!',
+        )
+        self.abandoned = StudentAssessment.objects.create(
+            student=self.student,
+            status='abandoned',
+            career_category='it',
+        )
+        self.client.force_login(self.student)
+
+    def test_abandoned_assessment_is_shown_on_results_page(self):
+        response = self.client.get(reverse('assessment_results'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Assessment Abandoned')
+        self.assertContains(response, 'Abandoned')
+        self.assertEqual(list(response.context['assessment_history']), [self.abandoned])
+
+    def test_abandoned_assessment_is_shown_in_dashboard_history(self):
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Assessment History')
+        self.assertEqual(list(response.context['assessment_history']), [self.abandoned])
+
+
+class AssessmentLibraryTests(TestCase):
+    def setUp(self):
+        self.staff = StudentUser.objects.create_user(
+            username='staff-library',
+            student_id='staff-library',
+            email='staff-library@example.com',
+            password='TestPass123!',
+            is_staff=True,
+        )
+        self.client.force_login(self.staff)
+
+    def test_categories_without_files_are_marked_unavailable(self):
+        response = self.client.get(reverse('assessment_tests_admin'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Not available at the moment.')
+
 class PublicAssessmentResultsTests(TestCase):
     def setUp(self):
         self.student = StudentUser.objects.create_user(
@@ -146,6 +194,7 @@ class PublicAssessmentResultsTests(TestCase):
             f"{reverse('public_assessment_results', args=[self.student.qr_code])}",
         )
 
+    @override_settings(ALLOWED_HOSTS=['[::1]'])
     @patch('career.views.get_lan_ip_address', return_value='192.168.1.25')
     def test_qr_profile_uses_network_address_for_localhost(self, _get_lan_ip_address):
         self.client.force_login(self.student)
@@ -162,6 +211,7 @@ class PublicAssessmentResultsTests(TestCase):
             f"{reverse('public_assessment_results', args=[self.student.qr_code])}",
         )
 
+    @override_settings(ALLOWED_HOSTS=['public.example.com'])
     def test_qr_profile_keeps_https_behind_cloudflare(self):
         self.client.force_login(self.student)
 
